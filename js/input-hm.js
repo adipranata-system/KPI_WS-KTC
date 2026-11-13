@@ -18,149 +18,11 @@ const InputHmModule = {
   },
 
   /**
-   * Inisialisasi tanggal default (hari ini) dan muat data dari server
+   * Menambah 1 baris input unit baru ke tabel DAY atau NIGHT dan auto-fokus ke Combo Box Unit ID
    */
-  init() {
-    const dateInput = document.getElementById('op-date-picker');
-    if (dateInput && !dateInput.value) {
-      dateInput.value = this.getTodayYMD();
-    }
-    this.loadDate();
-  },
-
-  getTodayYMD() {
-    const now = new Date();
-    const y = now.getFullYear();
-    const m = String(now.getMonth() + 1).padStart(2, '0');
-    const d = String(now.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  },
-
-  /**
-   * Memuat data operasional yang tersimpan saat tanggal atau site diganti
-   */
-  async loadDate() {
-    const dateInput = document.getElementById('op-date-picker');
-    const statusBox = document.getElementById('op-status-msg');
-    if (!dateInput) return;
-
-    this.selectedDate = dateInput.value;
-    if (!this.selectedDate) return;
-
-    if (statusBox) {
-      statusBox.textContent = 'Memuat data shift & riwayat HM terakhir...';
-      statusBox.className = 'text-sm text-slate-500';
-    }
-
-    const res = await callBackendApi('GET_DAILY_OPERATION', {
-      site: AuthModule.currentSite,
-      date: this.selectedDate
-    });
-
-    if (res.status === 'success') {
-      this.isFriday = Boolean(res.isFriday);
-      this.shifts = res.shifts;
-      this.lastHmMap = res.lastHmMap || {};
-      this.operations = {
-        DAY: res.operations.DAY || [],
-        NIGHT: res.operations.NIGHT || []
-      };
-
-      this.syncShiftControlsUI();
-      this.renderShiftTable('DAY');
-      this.renderShiftTable('NIGHT');
-
-      if (statusBox) {
-        statusBox.textContent = `Data tanggal ${this.selectedDate} (${res.dayName}) siap.`;
-        statusBox.className = 'text-sm text-emerald-600 font-medium';
-      }
-    } else {
-      if (statusBox) {
-        statusBox.textContent = res.message || 'Gagal memuat data shift.';
-        statusBox.className = 'text-sm text-rose-600 font-medium';
-      }
-    }
-  },
-
-  /**
-   * Mendapatkan referensi HM Akhir terakhir untuk suatu unit:
-   * - Jika shift NIGHT, cek terlebih dahulu apakah unit tersebut sudah diinput di shift DAY hari yang sama.
-   * - Jika belum, gunakan riwayat HM Akhir dari tanggal sebelumnya (lastHmMap).
-   */
-  getExpectedStartHm(shiftName, unitId) {
-    const cleanId = String(unitId || '').trim();
-    if (!cleanId) return null;
-
-    if (shiftName === 'NIGHT') {
-      const dayRow = this.operations.DAY.find(r => String(r.unitId || '').trim() === cleanId);
-      if (dayRow && dayRow.hmEnd !== '' && !isNaN(parseFloat(dayRow.hmEnd))) {
-        return parseFloat(dayRow.hmEnd);
-      }
-    }
-
-    if (this.lastHmMap && this.lastHmMap[cleanId] !== undefined) {
-      return parseFloat(this.lastHmMap[cleanId]);
-    }
-
-    return null;
-  },
-
-  /**
-   * Sinkronisasi checkbox Shift Aktif, indikator Jumat (9 jam), dan input Hujan Global
-   */
-  syncShiftControlsUI() {
-    const fridayBadge = document.getElementById('op-friday-badge');
-    if (fridayBadge) {
-      fridayBadge.textContent = this.isFriday
-        ? 'Jadwal Jumat: Day Shift 9 Jam + Night Shift 10 Jam (Total 19 Jam)'
-        : 'Jadwal Normal: Day Shift 10 Jam + Night Shift 10 Jam (Total 20 Jam)';
-    }
-
-    ['DAY', 'NIGHT'].forEach(shift => {
-      const sLower = shift.toLowerCase();
-      const chkWorking = document.getElementById(`chk-${sLower}-working`);
-      const inputRain = document.getElementById(`rain-${sLower}-hours`);
-      const container = document.getElementById(`panel-${sLower}-shift`);
-      const maxBadge = document.getElementById(`max-hrs-${sLower}`);
-
-      const info = this.shifts[shift];
-      const maxHrs = info.isWorking ? ((shift === 'DAY' && this.isFriday) ? 9 : 10) : 0;
-
-      if (chkWorking) chkWorking.checked = info.isWorking;
-      if (inputRain) {
-        inputRain.value = info.rainHours || 0;
-        inputRain.max = maxHrs;
-        inputRain.disabled = !info.isWorking;
-      }
-      if (maxBadge) {
-        maxBadge.textContent = info.isWorking ? `Kuota: ${maxHrs} Jam` : 'LIBUR (0 Jam)';
-      }
-      if (container) {
-        container.style.opacity = info.isWorking ? '1' : '0.5';
-      }
-    });
-  },
-
-  /**
-   * Dipanggil saat admin mencentang / melepas centang Day Shift atau Night Shift
-   */
-  toggleShiftWorking(shiftName, isChecked) {
-    this.shifts[shiftName].isWorking = Boolean(isChecked);
-    if (!isChecked) {
-      this.shifts[shiftName].rainHours = 0;
-    }
-    this.syncShiftControlsUI();
-  },
-
-  updateRainHours(shiftName, val) {
-    this.shifts[shiftName].rainHours = Math.max(0, Number(val) || 0);
-  },
-
-  /**
-   * Menambah 1 baris input unit baru ke tabel DAY atau NIGHT
-   */
-  addUnitRow(shiftName) {
+  addUnitRow(shiftName, autoFocus = false) {
     if (!this.shifts[shiftName].isWorking) return;
+    const newIndex = this.operations[shiftName].length;
     this.operations[shiftName].push({
       unitId: '',
       model: '',
@@ -170,6 +32,49 @@ const InputHmModule = {
       remarks: ''
     });
     this.renderShiftTable(shiftName);
+
+    if (autoFocus) {
+      setTimeout(() => {
+        const selectEl = document.getElementById(`unit-select-${shiftName}-${newIndex}`);
+        if (selectEl) selectEl.focus();
+      }, 20);
+    }
+  },
+
+  /**
+   * Navigasi cepat menggunakan tombol Enter pada keyboard:
+   * - Enter di Unit ID -> pindah ke HM Awal (atau langsung ke HM Akhir jika HM Awal terisi otomatis)
+   * - Enter di HM Awal -> pindah ke HM Akhir
+   * - Enter di HM Akhir -> otomatis tambah baris unit baru & fokus ke Combo Box Unit ID berikutnya
+   */
+  handleRowKeydown(event, shiftName, index, field) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+
+    if (field === 'unitId') {
+      const startInput = document.getElementById(`hm-start-${shiftName}-${index}`);
+      const endInput = document.getElementById(`hm-end-${shiftName}-${index}`);
+      if (startInput && startInput.value !== '' && endInput) {
+        endInput.focus();
+        endInput.select();
+      } else if (startInput) {
+        startInput.focus();
+      }
+    } else if (field === 'hmStart') {
+      const endInput = document.getElementById(`hm-end-${shiftName}-${index}`);
+      if (endInput) {
+        endInput.focus();
+        endInput.select();
+      }
+    } else if (field === 'hmEnd') {
+      const nextIndex = index + 1;
+      if (nextIndex < this.operations[shiftName].length) {
+        const nextSelect = document.getElementById(`unit-select-${shiftName}-${nextIndex}`);
+        if (nextSelect) nextSelect.focus();
+      } else {
+        this.addUnitRow(shiftName, true);
+      }
+    }
   },
 
   removeUnitRow(shiftName, index) {
@@ -346,7 +251,9 @@ const InputHmModule = {
       return `
         <tr class="border-b border-slate-100 hover:bg-slate-50">
           <td class="px-3 py-2">
-            <select onchange="InputHmModule.onRowChange('${shiftName}', ${idx}, 'unitId', this.value)"
+            <select id="unit-select-${shiftName}-${idx}"
+              onchange="InputHmModule.onRowChange('${shiftName}', ${idx}, 'unitId', this.value)"
+              onkeydown="InputHmModule.handleRowKeydown(event, '${shiftName}', ${idx}, 'unitId')"
               class="w-44 px-2 py-1.5 text-xs font-semibold border border-slate-300 rounded bg-white focus:outline-none focus:border-blue-500">
               ${optionsHtml}
             </select>
@@ -357,11 +264,13 @@ const InputHmModule = {
           <td class="px-3 py-2">
             <input type="number" id="hm-start-${shiftName}-${idx}" step="0.1" value="${row.hmStart}" placeholder="0.0"
               oninput="InputHmModule.onRowChange('${shiftName}', ${idx}, 'hmStart', this.value)"
+              onkeydown="InputHmModule.handleRowKeydown(event, '${shiftName}', ${idx}, 'hmStart')"
               class="w-28 px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:border-blue-500" />
           </td>
           <td class="px-3 py-2">
             <input type="number" id="hm-end-${shiftName}-${idx}" step="0.1" value="${row.hmEnd}" placeholder="0.0"
               oninput="InputHmModule.onRowChange('${shiftName}', ${idx}, 'hmEnd', this.value)"
+              onkeydown="InputHmModule.handleRowKeydown(event, '${shiftName}', ${idx}, 'hmEnd')"
               class="w-28 px-2 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:border-blue-500" />
           </td>
           <td id="wh-${shiftName}-${idx}" class="px-3 py-2 font-bold text-emerald-700 text-sm">
