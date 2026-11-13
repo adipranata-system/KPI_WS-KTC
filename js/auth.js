@@ -7,6 +7,7 @@ const AuthModule = {
   currentSite: 'TTLP',
   masterData: {
     units: [],
+    allSiteUnits: [],
     models: [],
     components: {}
   },
@@ -110,7 +111,7 @@ const AuthModule = {
   },
 
   /**
-   * Mengambil daftar unit aktif & model dari DB_MASTER
+   * Mengambil daftar unit aktif, seluruh unit site, & model dari DB_MASTER
    */
   async loadMasterData(site) {
     const targetSite = String(site || this.currentSite).toUpperCase();
@@ -120,6 +121,7 @@ const AuthModule = {
     if (res.status === 'success') {
       this.masterData = {
         units: res.units || [],
+        allSiteUnits: res.allSiteUnits || res.units || [],
         models: res.models || [],
         components: res.components || {}
       };
