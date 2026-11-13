@@ -1,11 +1,41 @@
 /**
  * js/population.js
- * Form Mandiri Admin untuk Menambah Unit Baru & Mengubah Status Populasi (W, SW, R, S)
+ * Form Mandiri Admin untuk Menarik Data Populasi dari Master, Mengubah Status Massal, & Menambah Unit Baru
  */
 
 const PopulationModule = {
   /**
-   * Merender daftar unit aktif pada site saat ini beserta form ubah status cepat
+   * Menarik ulang seluruh data unit site aktif langsung dari DB_MASTER
+   */
+  async pullFromMaster() {
+    const btnPull = document.getElementById('btn-pull-master');
+    const statusBox = document.getElementById('pop-status-msg');
+
+    if (btnPull) {
+      btnPull.disabled = true;
+      btnPull.textContent = 'Menarik Data...';
+    }
+    if (statusBox) {
+      statusBox.textContent = `Menarik data populasi unit ${AuthModule.currentSite} dari Master Data...`;
+      statusBox.className = 'text-sm text-blue-600 font-medium';
+    }
+
+    await AuthModule.loadMasterData(AuthModule.currentSite);
+    this.renderTable();
+
+    if (btnPull) {
+      btnPull.disabled = false;
+      btnPull.textContent = 'Tarik Data dari Master';
+    }
+    if (statusBox) {
+      const total = (AuthModule.masterData.allSiteUnits || []).length;
+      statusBox.textContent = `Berhasil menarik ${total} unit untuk site ${AuthModule.currentSite}. Ubah status pada baris yang berbeda lalu klik Simpan Perubahan Status.`;
+      statusBox.className = 'text-sm text-emerald-600 font-semibold';
+    }
+  },
+
+  /**
+   * Merender seluruh unit milik site saat ini beserta Combo Box status langsung di tabel
    */
   renderTable() {
     const tbody = document.getElementById('tbody-population-list');
@@ -15,57 +45,137 @@ const PopulationModule = {
     if (!tbody) return;
 
     const keyword = String(searchInput?.value || '').trim().toLowerCase();
-    const units = AuthModule.masterData.units || [];
+    const allUnits = AuthModule.masterData.allSiteUnits || AuthModule.masterData.units || [];
 
-    const filtered = units.filter(u => {
+    const filtered = allUnits.filter(u => {
       if (!keyword) return true;
       return (
         u.unitId.toLowerCase().includes(keyword) ||
         u.model.toLowerCase().includes(keyword) ||
         u.equipment.toLowerCase().includes(keyword) ||
-        u.brand.toLowerCase().includes(keyword)
+        u.brand.toLowerCase().includes(keyword) ||
+        u.category.toLowerCase().includes(keyword)
       );
     });
 
+    const activeCount = allUnits.filter(u => ['W', 'SW', 'R'].includes(u.status)).length;
     if (countBadge) {
-      countBadge.textContent = `${filtered.length} Unit Aktif (${AuthModule.currentSite})`;
+      countBadge.textContent = `${activeCount} Aktif / ${allUnits.length} Total (${AuthModule.currentSite})`;
     }
 
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
           <td colspan="6" class="px-4 py-6 text-center text-sm text-slate-400">
-            Tidak ada unit yang sesuai dengan pencarian.
+            Tidak ada unit ditemukan. Klik "Tarik Data dari Master" untuk memuat ulang.
           </td>
         </tr>`;
       return;
     }
 
+    const statusOptions = [
+      { val: 'W', label: 'W (Working)' },
+      { val: 'SW', label: 'SW (Standby Working)' },
+      { val: 'R', label: 'R (Repair)' },
+      { val: 'S', label: 'S (Scrap / Nonaktif)' }
+    ];
+
     tbody.innerHTML = filtered.map(u => {
-      const badgeColor = {
-        W: 'bg-emerald-100 text-emerald-700',
-        SW: 'bg-blue-100 text-blue-700',
-        R: 'bg-amber-100 text-amber-700'
-      }[u.status] || 'bg-slate-100 text-slate-700';
+      const isScrap = u.status === 'S';
+      const rowBg = isScrap ? 'bg-slate-50/80 text-slate-400' : 'hover:bg-slate-50';
+      const selectStyle = {
+        W: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+        SW: 'border-blue-300 bg-blue-50 text-blue-800',
+        R: 'border-amber-300 bg-amber-50 text-amber-800',
+        S: 'border-rose-300 bg-rose-50 text-rose-700'
+      }[u.status] || 'border-slate-300 bg-white text-slate-700';
+
+      const optsHtml = statusOptions.map(opt => {
+        const sel = u.status === opt.val ? 'selected' : '';
+        return `<option value="${opt.val}" ${sel}>${opt.label}</option>`;
+      }).join('');
 
       return `
-        <tr class="border-b border-slate-100 text-sm hover:bg-slate-50">
-          <td class="px-4 py-2.5 font-bold text-slate-800">${u.unitId}</td>
-          <td class="px-4 py-2.5 text-slate-600">${u.equipment || '-'}</td>
-          <td class="px-4 py-2.5 text-slate-600">${u.brand || '-'}</td>
-          <td class="px-4 py-2.5 font-medium text-slate-800">${u.model}</td>
-          <td class="px-4 py-2.5">
-            <span class="px-2 py-0.5 text-xs font-semibold rounded ${badgeColor}">${u.status}</span>
-          </td>
-          <td class="px-4 py-2.5 text-right">
-            <button type="button" onclick="PopulationModule.openStatusModal('${u.unitId}', '${u.model}', '${u.status}')"
-              class="px-2.5 py-1 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded border border-blue-200">
-              Ubah Status
-            </button>
+        <tr class="border-b border-slate-100 text-xs ${rowBg}">
+          <td class="px-4 py-2 font-bold ${isScrap ? 'text-slate-500 line-through' : 'text-slate-800'}">${u.unitId}</td>
+          <td class="px-4 py-2">${u.category || '-'}</td>
+          <td class="px-4 py-2">${u.equipment || '-'}</td>
+          <td class="px-4 py-2">${u.brand || '-'}</td>
+          <td class="px-4 py-2 font-medium">${u.model}</td>
+          <td class="px-4 py-2">
+            <select data-unit-id="${u.unitId}" data-old-status="${u.status}"
+              onchange="PopulationModule.onInlineStatusChange(this)"
+              class="pop-status-select px-2.5 py-1 text-xs font-semibold rounded border focus:outline-none ${selectStyle}">
+              ${optsHtml}
+            </select>
           </td>
         </tr>
       `;
     }).join('');
+  },
+
+  /**
+   * Memberi tanda visual pada baris yang statusnya diubah admin sebelum disimpan
+   */
+  onInlineStatusChange(selectEl) {
+    const oldStatus = selectEl.getAttribute('data-old-status');
+    const newStatus = selectEl.value;
+    if (oldStatus !== newStatus) {
+      selectEl.classList.add('ring-2', 'ring-blue-500');
+    } else {
+      selectEl.classList.remove('ring-2', 'ring-blue-500');
+    }
+  },
+
+  /**
+   * Menyimpan seluruh perubahan status unit yang diubah di tabel ke DB_MASTER sekaligus
+   */
+  async saveBulkStatus() {
+    const statusBox = document.getElementById('pop-status-msg');
+    const btnSave = document.getElementById('btn-save-bulk-status');
+    const selects = document.querySelectorAll('.pop-status-select');
+
+    const changes = [];
+    selects.forEach(sel => {
+      const unitId = sel.getAttribute('data-unit-id');
+      const oldStatus = sel.getAttribute('data-old-status');
+      const newStatus = sel.value;
+      if (unitId && oldStatus !== newStatus) {
+        changes.push({ unitId: unitId, status: newStatus });
+      }
+    });
+
+    if (changes.length === 0) {
+      statusBox.textContent = 'Tidak ada perubahan status yang perlu disimpan.';
+      statusBox.className = 'text-sm text-amber-600 font-semibold';
+      return;
+    }
+
+    if (btnSave) {
+      btnSave.disabled = true;
+      btnSave.textContent = `Menyimpan (${changes.length})...`;
+    }
+
+    const res = await callBackendApi('MANAGE_UNIT_POPULATION', {
+      mode: 'BULK_UPDATE_STATUS',
+      site: AuthModule.currentSite,
+      changes: changes
+    });
+
+    if (btnSave) {
+      btnSave.disabled = false;
+      btnSave.textContent = 'Simpan Perubahan Status';
+    }
+
+    if (res.status === 'success') {
+      statusBox.textContent = res.message;
+      statusBox.className = 'text-sm text-emerald-600 font-semibold';
+      await AuthModule.loadMasterData(AuthModule.currentSite);
+      this.renderTable();
+    } else {
+      statusBox.textContent = res.message || 'Gagal menyimpan perubahan status.';
+      statusBox.className = 'text-sm text-rose-600 font-semibold';
+    }
   },
 
   /**
@@ -121,64 +231,6 @@ const PopulationModule = {
       this.renderTable();
     } else {
       statusBox.textContent = res.message || 'Gagal menambah unit.';
-      statusBox.className = 'text-sm text-rose-600 font-semibold';
-    }
-  },
-
-  /**
-   * Membuka form inline/panel untuk mengubah status unit (misal menjadi S / Scrap)
-   */
-  openStatusModal(unitId, model, currentStatus) {
-    const panel = document.getElementById('panel-update-status');
-    if (!panel) return;
-
-    document.getElementById('edit-unit-id').value = unitId;
-    document.getElementById('edit-unit-label').textContent = `${unitId} (${model}) - Status Saat Ini: ${currentStatus}`;
-    document.getElementById('edit-unit-status').value = currentStatus;
-    document.getElementById('edit-unit-reason').value = '';
-
-    panel.classList.remove('hidden');
-    panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  },
-
-  closeStatusModal() {
-    const panel = document.getElementById('panel-update-status');
-    if (panel) panel.classList.add('hidden');
-  },
-
-  /**
-   * Mengirim pembaruan status unit ke server (jika diubah ke S, unit otomatis keluar dari populasi aktif)
-   */
-  async submitStatusUpdate(event) {
-    if (event) event.preventDefault();
-
-    const statusBox = document.getElementById('pop-status-msg');
-    const unitId = document.getElementById('edit-unit-id')?.value.trim();
-    const newStatus = document.getElementById('edit-unit-status')?.value;
-    const reason = document.getElementById('edit-unit-reason')?.value.trim();
-
-    if (!reason) {
-      statusBox.textContent = 'Keterangan / alasan perubahan status wajib diisi untuk log monitoring.';
-      statusBox.className = 'text-sm text-rose-600 font-semibold';
-      return;
-    }
-
-    const res = await callBackendApi('MANAGE_UNIT_POPULATION', {
-      mode: 'UPDATE_STATUS',
-      site: AuthModule.currentSite,
-      unitId: unitId,
-      status: newStatus,
-      reason: reason
-    });
-
-    if (res.status === 'success') {
-      statusBox.textContent = res.message;
-      statusBox.className = 'text-sm text-emerald-600 font-semibold';
-      this.closeStatusModal();
-      await AuthModule.loadMasterData(AuthModule.currentSite);
-      this.renderTable();
-    } else {
-      statusBox.textContent = res.message || 'Gagal memperbarui status unit.';
       statusBox.className = 'text-sm text-rose-600 font-semibold';
     }
   }
