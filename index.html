@@ -491,35 +491,6 @@
 
         <div id="pop-status-msg" class="text-sm"></div>
 
-        <!-- Panel Ubah Status Unit (Muncul saat tombol Ubah Status diklik) -->
-        <div id="panel-update-status" class="hidden bg-amber-50 p-4 rounded-xl border border-amber-300 space-y-3">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-bold text-amber-900">Ubah Status Populasi Unit</h3>
-            <button type="button" onclick="PopulationModule.closeStatusModal()" class="text-xs text-slate-500 hover:text-slate-800">Tutup</button>
-          </div>
-          <p id="edit-unit-label" class="text-xs font-semibold text-slate-700">-</p>
-          <form onsubmit="PopulationModule.submitStatusUpdate(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-            <input type="hidden" id="edit-unit-id" />
-            <div>
-              <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Status Baru</label>
-              <select id="edit-unit-status" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white">
-                <option value="W">W (Working - Aktif)</option>
-                <option value="SW">SW (Standby Working - Aktif)</option>
-                <option value="R">R (Repair - Aktif)</option>
-                <option value="S">S (Scrap / Keluar Populasi)</option>
-              </select>
-            </div>
-            <div class="md:col-span-2">
-              <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Alasan Perubahan (Wajib untuk Audit Log)</label>
-              <input type="text" id="edit-unit-reason" required placeholder="Contoh: Unit afkir / mutasi ke site lain"
-                class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white" />
-            </div>
-            <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg">
-              Simpan Perubahan Status
-            </button>
-          </form>
-        </div>
-
         <!-- Form Tambah Unit Baru -->
         <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
           <h3 class="text-sm font-bold text-slate-800 mb-3">Tambah Unit Baru ke Site Aktif</h3>
@@ -569,27 +540,38 @@
           </form>
         </div>
 
-        <!-- Tabel Daftar Populasi Aktif -->
+        <!-- Tabel Daftar Seluruh Populasi Unit Site -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-            <div class="flex items-center gap-2">
-              <h3 class="text-sm font-bold text-slate-800">Populasi Unit Aktif</h3>
-              <span id="pop-total-badge" class="px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">0 Unit</span>
+          <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-2">
+              <h3 class="text-sm font-bold text-slate-800">Daftar Populasi Unit Site</h3>
+              <span id="pop-total-badge" class="px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">0 Unit</span>
+              <button type="button" id="btn-pull-master" onclick="PopulationModule.pullFromMaster()"
+                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition">
+                Tarik Data dari Master
+              </button>
             </div>
-            <input type="text" id="pop-search-input" oninput="PopulationModule.renderTable()"
-              placeholder="Cari Unit ID / Model / Brand..."
-              class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+
+            <div class="flex flex-wrap items-center gap-2">
+              <input type="text" id="pop-search-input" oninput="PopulationModule.renderTable()"
+                placeholder="Cari Unit ID / Model / Brand..."
+                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+              <button type="button" id="btn-save-bulk-status" onclick="PopulationModule.saveBulkStatus()"
+                class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow transition">
+                Simpan Perubahan Status
+              </button>
+            </div>
           </div>
-          <div class="overflow-x-auto max-h-[28rem]">
+          <div class="overflow-x-auto max-h-[32rem]">
             <table class="w-full text-left border-collapse">
               <thead class="sticky top-0 bg-slate-50 shadow-sm">
                 <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
                   <th class="px-4 py-2.5">Unit ID</th>
+                  <th class="px-4 py-2.5">Category</th>
                   <th class="px-4 py-2.5">Equipment</th>
                   <th class="px-4 py-2.5">Brand</th>
                   <th class="px-4 py-2.5">Model</th>
-                  <th class="px-4 py-2.5">Status</th>
-                  <th class="px-4 py-2.5 text-right">Aksi</th>
+                  <th class="px-4 py-2.5">Status Populasi</th>
                 </tr>
               </thead>
               <tbody id="tbody-population-list"></tbody>
@@ -634,7 +616,7 @@
       // Inisialisasi data sesuai tab yang dibuka
       if (tabId === 'tab-dashboard') DashboardModule.load();
       if (tabId === 'tab-input-hm') InputHmModule.init();
-      if (tabId === 'tab-population') PopulationModule.renderTable();
+      if (tabId === 'tab-population') PopulationModule.pullFromMaster();
     }
 
     // Event Listener Form Login
