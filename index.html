@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Plant KPI Monitoring System</title>
+
+  <!-- Tailwind CSS CDN untuk tampilan bersih & responsif -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Chart.js untuk grafik tren harian & pareto kerusakan -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- SheetJS (XLSX) untuk membaca & export file Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased">
+
+  <!-- ========================================================= -->
+  <!-- 1. HALAMAN LOGIN                                          -->
+  <!-- ========================================================= -->
+  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 bg-slate-900">
+    <div class="w-full max-w-md bg-white rounded-xl shadow-xl p-8">
+      <div class="text-center mb-6">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-blue-600 text-white font-bold text-xl mb-3">
+          KPI
+        </div>
+        <h1 class="text-xl font-bold text-slate-900">PLANT KPI MONITORING</h1>
+        <p class="text-xs text-slate-500 mt-1">PT. KTC COAL MINING &amp; ENERGY</p>
+      </div>
+
+      <form id="form-login" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Username</label>
+          <input type="text" id="login-username" required autocomplete="username"
+            placeholder="Masukkan username"
+            class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Password</label>
+          <input type="password" id="login-password" required autocomplete="current-password"
+            placeholder="Masukkan password"
+            class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+
+        <div id="login-error-msg" class="text-xs text-rose-600 font-semibold min-h-[1rem]"></div>
+
+        <button type="submit" id="btn-login-submit"
+          class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-lg transition">
+          Masuk ke Sistem
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 2. SHELL UTAMA APLIKASI (SETELAH LOGIN)                   -->
+  <!-- ========================================================= -->
+  <div id="app-shell" class="hidden min-h-screen flex flex-col">
+
+    <!-- Top Navbar -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+      <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span class="px-2.5 py-1 bg-blue-600 rounded font-bold text-xs tracking-wider">PLANT DEPT</span>
+          <div>
+            <h1 class="text-sm font-bold leading-tight">KPI Monitoring &amp; Daily Report</h1>
+            <p class="text-[11px] text-slate-400">PT. KTC Coal Mining &amp; Energy</p>
+          </div>
+        </div>
+
+        <!-- Global Site Selector & User Info -->
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700">
+            <label for="global-site-selector" class="text-[11px] text-slate-400 font-semibold">SITE:</label>
+            <select id="global-site-selector" onchange="AuthModule.switchSite(this.value)"
+              class="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer">
+              <option value="TTLP" class="text-slate-900">TTLP</option>
+              <option value="TNPN" class="text-slate-900">TNPN</option>
+            </select>
+          </div>
+
+          <div class="text-right hidden sm:block">
+            <div id="user-display-name" class="text-xs font-semibold text-white">-</div>
+            <div id="user-role-badge" class="text-[10px] text-blue-300">-</div>
+          </div>
+
+          <button type="button" onclick="AuthModule.logout()"
+            class="px-3 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 rounded-lg transition">
+            Keluar
+          </button>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="bg-slate-800 border-t border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 flex overflow-x-auto gap-1">
+          <button type="button" data-tab="tab-dashboard" onclick="switchAppTab('tab-dashboard')"
+            class="nav-tab-btn px-4 py-2.5 text-xs font-semibold border-b-2 border-blue-500 text-white whitespace-nowrap">
+            Dashboard KPI
+          </button>
+          <button type="button" data-tab="tab-input-hm" onclick="switchAppTab('tab-input-hm')"
+            class="nav-tab-btn admin-only-menu px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap">
+            Input HM Harian
+          </button>
+          <button type="button" data-tab="tab-upload-bd" onclick="switchAppTab('tab-upload-bd')"
+            class="nav-tab-btn admin-only-menu px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap">
+            Upload Breakdown Excel
+          </button>
+          <button type="button" data-tab="tab-population" onclick="switchAppTab('tab-population')"
+            class="nav-tab-btn admin-only-menu px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap">
+            Kelola Populasi Unit
+          </button>
+        </div>
+      </nav>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+
+      <!-- ===================================================== -->
+      <!-- TAB 1: DASHBOARD KPI                                  -->
+      <!-- ===================================================== -->
+      <section id="tab-dashboard" class="app-tab-panel space-y-6">
+
+        <!-- Filter Bar -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-end justify-between gap-4">
+          <div class="flex flex-wrap items-end gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Dari Tanggal</label>
+              <input type="date" id="dash-start-date"
+                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Sampai Tanggal</label>
+              <input type="date" id="dash-end-date"
+                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Filter Model Unit</label>
+              <select id="dash-filter-model"
+                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500">
+                <option value="ALL">Semua Model Unit</option>
+              </select>
+            </div>
+            <button type="button" onclick="DashboardModule.load()"
+              class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition">
+              Tampilkan Data
+            </button>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <span id="dash-status-msg" class="text-xs text-slate-500"></span>
+            <button type="button" onclick="DashboardModule.exportToExcel()"
+              class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition">
+              Export Excel
+            </button>
+          </div>
+        </div>
+
+        <!-- 5 Kartu KPI Utama -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div class="text-xs font-semibold text-slate-500">Physical Availability (PA)</div>
+            <div id="kpi-val-pa" class="text-2xl font-extrabold text-slate-900 mt-1">0.00%</div>
+            <span id="kpi-badge-pa" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">-</span>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div class="text-xs font-semibold text-slate-500">Mechanical Availability (MA)</div>
+            <div id="kpi-val-ma" class="text-2xl font-extrabold text-slate-900 mt-1">0.00%</div>
+            <span id="kpi-badge-ma" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">-</span>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div class="text-xs font-semibold text-slate-500">Use of Availability (UA)</div>
+            <div id="kpi-val-ua" class="text-2xl font-extrabold text-slate-900 mt-1">0.00%</div>
+            <span id="kpi-badge-ua" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">-</span>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <div class="text-xs font-semibold text-slate-500">MTTR (Unscheduled)</div>
+            <div id="kpi-val-mttr" class="text-2xl font-extrabold text-slate-900 mt-1">0.00 Jam</div>
+            <span class="inline-block mt-1 text-[11px] text-slate-400">Rata-rata durasi perbaikan</span>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 col-span-2 md:col-span-1">
+            <div class="text-xs font-semibold text-slate-500">MTBR (Unscheduled)</div>
+            <div id="kpi-val-mtbr" class="text-2xl font-extrabold text-slate-900 mt-1">0.00 Jam</div>
+            <span class="inline-block mt-1 text-[11px] text-slate-400">Rata-rata jarak antar rusak</span>
+          </div>
+        </div>
+
+        <!-- Ringkasan Akumulasi Jam -->
+        <div class="bg-slate-800 text-slate-200 px-4 py-2.5 rounded-lg text-xs flex flex-wrap justify-between items-center gap-2">
+          <span class="font-semibold text-blue-300">Distribusi Jam Terkonsolidasi:</span>
+          <span id="kpi-hours-summary" class="font-mono">-</span>
+        </div>
+
+        <!-- Grafik Tren & Pareto Komponen -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-sm font-bold text-slate-800 mb-3">Tren Harian PA, MA &amp; UA (%)</h2>
+            <div class="h-64">
+              <canvas id="chart-kpi-trend"></canvas>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-sm font-bold text-slate-800 mb-3">Top 10 Pareto Komponen Rusak (Unscheduled)</h2>
+            <div class="h-64">
+              <canvas id="chart-component-pareto"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Unit Berstatus Breakdown (Open) -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
+            <h2 class="text-sm font-bold text-rose-800">Daftar Unit Status Breakdown (Belum RFU)</h2>
+            <span id="badge-active-bd-count" class="px-2.5 py-0.5 text-xs font-bold bg-rose-600 text-white rounded-full">0 Unit Down</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                  <th class="px-3 py-2">Unit ID</th>
+                  <th class="px-3 py-2">Model</th>
+                  <th class="px-3 py-2">Mulai Rusak</th>
+                  <th class="px-3 py-2">Code</th>
+                  <th class="px-3 py-2">Lokasi</th>
+                  <th class="px-3 py-2">Problem</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-active-bd"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tabel KPI Per Model Unit -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-200">
+            <h2 class="text-sm font-bold text-slate-800">Performa KPI Per Model Unit</h2>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                  <th class="px-3 py-2.5">Model Unit</th>
+                  <th class="px-3 py-2.5 text-right">WH (j)</th>
+                  <th class="px-3 py-2.5 text-right">BD Unsch (j)</th>
+                  <th class="px-3 py-2.5 text-right">BD Sch (j)</th>
+                  <th class="px-3 py-2.5 text-right">Standby (j)</th>
+                  <th class="px-3 py-2.5 text-right">PA</th>
+                  <th class="px-3 py-2.5 text-right">MA</th>
+                  <th class="px-3 py-2.5 text-right">UA</th>
+                  <th class="px-3 py-2.5 text-right">MTTR</th>
+                  <th class="px-3 py-2.5 text-right">MTBR</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-kpi-model"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tabel KPI Per Unit -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <h2 class="text-sm font-bold text-slate-800">Detail Performa KPI Per Unit</h2>
+            <input type="text" id="dash-unit-search" oninput="DashboardModule.renderUnitTable()"
+              placeholder="Cari Unit ID atau Model..."
+              class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+          </div>
+          <div class="overflow-x-auto max-h-[28rem]">
+            <table class="w-full text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-50 shadow-sm">
+                <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                  <th class="px-3 py-2.5">Unit ID</th>
+                  <th class="px-3 py-2.5">Model</th>
+                  <th class="px-3 py-2.5 text-right">WH (j)</th>
+                  <th class="px-3 py-2.5 text-right">BD Unsch (j)</th>
+                  <th class="px-3 py-2.5 text-right">BD Sch (j)</th>
+                  <th class="px-3 py-2.5 text-right">Standby (j)</th>
+                  <th class="px-3 py-2.5 text-right">PA</th>
+                  <th class="px-3 py-2.5 text-right">MA</th>
+                  <th class="px-3 py-2.5 text-right">UA</th>
+                  <th class="px-3 py-2.5 text-right">MTTR</th>
+                  <th class="px-3 py-2.5 text-right">MTBR</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-kpi-unit"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- TAB 2: INPUT HM HARIAN (DAY & NIGHT SHIFT)            -->
+      <!-- ===================================================== -->
+      <section id="tab-input-hm" class="app-tab-panel hidden space-y-6">
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Tanggal Operasional</label>
+              <input type="date" id="op-date-picker" onchange="InputHmModule.loadDate()"
+                class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+            </div>
+            <span id="op-friday-badge" class="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold">
+              Jadwal Normal: 20 Jam
+            </span>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <span id="op-status-msg" class="text-sm"></span>
+            <button type="button" id="btn-save-op" onclick="InputHmModule.saveAll()"
+              class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow transition">
+              Simpan Data Operasional Harian
+            </button>
+          </div>
+        </div>
+
+        <!-- Panel Day Shift -->
+        <div id="panel-day-shift" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition">
+          <div class="px-4 py-3 bg-amber-50 border-b border-amber-200 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-day-working" checked
+                  onchange="InputHmModule.toggleShiftWorking('DAY', this.checked)"
+                  class="w-4 h-4 text-blue-600 rounded" />
+                <span class="text-sm font-bold text-slate-800">DAY SHIFT (06:00 - 17:00 WIB)</span>
+              </label>
+              <span id="max-hrs-day" class="px-2 py-0.5 text-xs font-semibold bg-amber-200 text-amber-900 rounded">Kuota: 10 Jam</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1.5">
+                <label class="text-xs font-semibold text-slate-700">Hujan Global (Jam):</label>
+                <input type="number" id="rain-day-hours" step="0.1" min="0" max="10" value="0"
+                  oninput="InputHmModule.updateRainHours('DAY', this.value)"
+                  class="w-20 px-2 py-1 text-xs border border-slate-300 rounded bg-white" />
+              </div>
+              <button type="button" onclick="InputHmModule.addUnitRow('DAY')"
+                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg">
+                + Tambah Unit Day
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                  <th class="px-3 py-2">Unit ID</th>
+                  <th class="px-3 py-2">Model</th>
+                  <th class="px-3 py-2">HM Awal</th>
+                  <th class="px-3 py-2">HM Akhir</th>
+                  <th class="px-3 py-2">WH</th>
+                  <th class="px-3 py-2">Keterangan Otomatis</th>
+                  <th class="px-3 py-2 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-day-op"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Panel Night Shift -->
+        <div id="panel-night-shift" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition">
+          <div class="px-4 py-3 bg-indigo-50 border-b border-indigo-200 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+              <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="chk-night-working" checked
+                  onchange="InputHmModule.toggleShiftWorking('NIGHT', this.checked)"
+                  class="w-4 h-4 text-blue-600 rounded" />
+                <span class="text-sm font-bold text-slate-800">NIGHT SHIFT (18:00 - 05:00 WIB)</span>
+              </label>
+              <span id="max-hrs-night" class="px-2 py-0.5 text-xs font-semibold bg-indigo-200 text-indigo-900 rounded">Kuota: 10 Jam</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <div class="flex items-center gap-1.5">
+                <label class="text-xs font-semibold text-slate-700">Hujan Global (Jam):</label>
+                <input type="number" id="rain-night-hours" step="0.1" min="0" max="10" value="0"
+                  oninput="InputHmModule.updateRainHours('NIGHT', this.value)"
+                  class="w-20 px-2 py-1 text-xs border border-slate-300 rounded bg-white" />
+              </div>
+              <button type="button" onclick="InputHmModule.addUnitRow('NIGHT')"
+                class="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg">
+                + Tambah Unit Night
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                  <th class="px-3 py-2">Unit ID</th>
+                  <th class="px-3 py-2">Model</th>
+                  <th class="px-3 py-2">HM Awal</th>
+                  <th class="px-3 py-2">HM Akhir</th>
+                  <th class="px-3 py-2">WH</th>
+                  <th class="px-3 py-2">Keterangan Otomatis</th>
+                  <th class="px-3 py-2 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-night-op"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- TAB 3: UPLOAD EXCEL DAILY REPORT BREAKDOWN            -->
+      <!-- ===================================================== -->
+      <section id="tab-upload-bd" class="app-tab-panel hidden space-y-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Upload Daily Report Machine (.xlsx)</h2>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Sistem otomatis menyaring unit aktif site ini, memotong jam istirahat &amp; change shift, serta memperbarui baris yang sebelumnya berstatus Breakdown.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div class="md:col-span-2">
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Pilih File Excel (.xlsx)</label>
+              <input type="file" id="excel-file-input" accept=".xlsx,.xls"
+                onchange="UploadExcelModule.handleFileSelect(event)"
+                class="block w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-slate-300 rounded-lg p-1" />
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Filter Dari Tanggal (Opsional)</label>
+              <input type="date" id="excel-filter-from"
+                class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg" />
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Sampai Tanggal (Opsional)</label>
+              <input type="date" id="excel-filter-to"
+                class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg" />
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <span id="upload-status-msg" class="text-sm text-slate-500">Pilih file Daily Report Machine untuk memulai.</span>
+            <button type="button" id="btn-submit-excel" disabled onclick="UploadExcelModule.submitToServer()"
+              class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-lg transition">
+              Upload ke Database
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview Hasil Parsing Excel -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-200">
+            <h3 class="text-sm font-bold text-slate-800">Preview Data Terbaca (50 Baris Terbaru)</h3>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                  <th class="px-3 py-2">Tanggal</th>
+                  <th class="px-3 py-2">Unit</th>
+                  <th class="px-3 py-2">Code</th>
+                  <th class="px-3 py-2">Status</th>
+                  <th class="px-3 py-2">IN</th>
+                  <th class="px-3 py-2">Out / RFU</th>
+                  <th class="px-3 py-2">Comp</th>
+                  <th class="px-3 py-2">Problem</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-excel-preview">
+                <tr>
+                  <td colspan="8" class="px-4 py-6 text-center text-sm text-slate-400">
+                    Belum ada data Excel yang diproses.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================== -->
+      <!-- TAB 4: KELOLA POPULASI UNIT MANDIRI                   -->
+      <!-- ===================================================== -->
+      <section id="tab-population" class="app-tab-panel hidden space-y-6">
+
+        <div id="pop-status-msg" class="text-sm"></div>
+
+        <!-- Panel Ubah Status Unit (Muncul saat tombol Ubah Status diklik) -->
+        <div id="panel-update-status" class="hidden bg-amber-50 p-4 rounded-xl border border-amber-300 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-amber-900">Ubah Status Populasi Unit</h3>
+            <button type="button" onclick="PopulationModule.closeStatusModal()" class="text-xs text-slate-500 hover:text-slate-800">Tutup</button>
+          </div>
+          <p id="edit-unit-label" class="text-xs font-semibold text-slate-700">-</p>
+          <form onsubmit="PopulationModule.submitStatusUpdate(event)" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <input type="hidden" id="edit-unit-id" />
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Status Baru</label>
+              <select id="edit-unit-status" class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white">
+                <option value="W">W (Working - Aktif)</option>
+                <option value="SW">SW (Standby Working - Aktif)</option>
+                <option value="R">R (Repair - Aktif)</option>
+                <option value="S">S (Scrap / Keluar Populasi)</option>
+              </select>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Alasan Perubahan (Wajib untuk Audit Log)</label>
+              <input type="text" id="edit-unit-reason" required placeholder="Contoh: Unit afkir / mutasi ke site lain"
+                class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg bg-white" />
+            </div>
+            <button type="submit" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg">
+              Simpan Perubahan Status
+            </button>
+          </form>
+        </div>
+
+        <!-- Form Tambah Unit Baru -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-800 mb-3">Tambah Unit Baru ke Site Aktif</h3>
+          <form id="form-add-unit" onsubmit="PopulationModule.addNewUnit(event)" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 items-end">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Unit ID *</label>
+              <input type="text" id="new-unit-id" required placeholder="Contoh: 1350"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Model *</label>
+              <input type="text" id="new-unit-model" required placeholder="Contoh: ZX870H-3F"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Equipment</label>
+              <input type="text" id="new-unit-equipment" placeholder="Hydraulic Excavator"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Brand</label>
+              <input type="text" id="new-unit-brand" placeholder="Hitachi / Komatsu"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Category</label>
+              <input type="text" id="new-unit-category" placeholder="A. EXCAVATOR"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Status Awal</label>
+              <select id="new-unit-status" class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg">
+                <option value="W">W (Working)</option>
+                <option value="SW">SW (Standby Working)</option>
+                <option value="R">R (Repair)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Keterangan</label>
+              <input type="text" id="new-unit-reason" placeholder="Unit baru datang / mutasi masuk"
+                class="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+            </div>
+            <button type="submit" id="btn-add-unit"
+              class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg">
+              Tambah Unit
+            </button>
+          </form>
+        </div>
+
+        <!-- Tabel Daftar Populasi Aktif -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <h3 class="text-sm font-bold text-slate-800">Populasi Unit Aktif</h3>
+              <span id="pop-total-badge" class="px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">0 Unit</span>
+            </div>
+            <input type="text" id="pop-search-input" oninput="PopulationModule.renderTable()"
+              placeholder="Cari Unit ID / Model / Brand..."
+              class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
+          </div>
+          <div class="overflow-x-auto max-h-[28rem]">
+            <table class="w-full text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-50 shadow-sm">
+                <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                  <th class="px-4 py-2.5">Unit ID</th>
+                  <th class="px-4 py-2.5">Equipment</th>
+                  <th class="px-4 py-2.5">Brand</th>
+                  <th class="px-4 py-2.5">Model</th>
+                  <th class="px-4 py-2.5">Status</th>
+                  <th class="px-4 py-2.5 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-population-list"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ========================================================= -->
+  <!-- 3. PEMANGGILAN MODUL JAVASCRIPT TERPISAH                  -->
+  <!-- ========================================================= -->
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/input-hm.js"></script>
+  <script src="js/upload-excel.js"></script>
+  <script src="js/population.js"></script>
+  <script src="js/dashboard.js"></script>
+
+  <script>
+    // Navigasi antar Tab Utama
+    function switchAppTab(tabId) {
+      document.querySelectorAll('.app-tab-panel').forEach(panel => {
+        panel.classList.add('hidden');
+      });
+      document.querySelectorAll('.nav-tab-btn').forEach(btn => {
+        btn.classList.remove('border-blue-500', 'text-white');
+        btn.classList.add('border-transparent', 'text-slate-300');
+      });
+
+      const activePanel = document.getElementById(tabId);
+      if (activePanel) activePanel.classList.remove('hidden');
+
+      const activeBtn = document.querySelector(`.nav-tab-btn[data-tab="${tabId}"]`);
+      if (activeBtn) {
+        activeBtn.classList.remove('border-transparent', 'text-slate-300');
+        activeBtn.classList.add('border-blue-500', 'text-white');
+      }
+
+      // Inisialisasi data sesuai tab yang dibuka
+      if (tabId === 'tab-dashboard') DashboardModule.load();
+      if (tabId === 'tab-input-hm') InputHmModule.init();
+      if (tabId === 'tab-population') PopulationModule.renderTable();
+    }
+
+    // Event Listener Form Login
+    document.getElementById('form-login').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('btn-login-submit');
+      const errBox = document.getElementById('login-error-msg');
+      const u = document.getElementById('login-username').value;
+      const p = document.getElementById('login-password').value;
+
+      btn.disabled = true;
+      btn.textContent = 'Memverifikasi...';
+      errBox.textContent = '';
+
+      const res = await AuthModule.login(u, p);
+      btn.disabled = false;
+      btn.textContent = 'Masuk ke Sistem';
+
+      if (res.status !== 'success') {
+        errBox.textContent = res.message;
+      }
+    });
+
+    // Jalankan inisialisasi sesi saat halaman selesai dimuat
+    window.addEventListener('DOMContentLoaded', () => {
+      AuthModule.init();
+    });
+  </script>
+</body>
+</html>
