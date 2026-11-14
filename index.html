@@ -1184,6 +1184,11 @@
           <div class="flex flex-wrap items-end justify-between gap-4 pt-1">
             <div class="flex flex-wrap items-end gap-3">
               <div>
+                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Quick Month</label>
+                <input type="month" id="rep-month-picker" onchange="ReportModule.applyMonthPicker(this.value)"
+                  class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+              </div>
+              <div>
                 <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">From Date</label>
                 <input type="date" id="rep-start-date" onchange="ReportModule.load()"
                   class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
@@ -1222,14 +1227,49 @@
             </div>
           </div>
 
-          <!-- Optional Field Notes -->
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">
-              Special Field / Sparepart Notes (Optional &mdash; included in Chapter IV of PDF)
-            </label>
+          <!-- Optional Field Notes & Custom Chapter Narrative Editor -->
+          <div class="space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase">
+                Special Field / Sparepart Notes (Optional &mdash; included in Chapter IV of PDF)
+              </label>
+              <button type="button" id="btn-toggle-edit-narratives" onclick="ReportModule.toggleNarrativeEditor()"
+                class="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline">
+                &#9998; Customize Chapter Narratives (Optional)
+              </button>
+            </div>
             <textarea id="rep-custom-notes" rows="2" oninput="ReportModule.syncCustomNotes()"
               placeholder="e.g., Unit EX-1320 awaiting main pump seal kit shipment from vendor (ETA 16 Nov 2026)..."
               class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+
+            <!-- Collapsible Narrative Editor for Chapters I - IV -->
+            <div id="rep-edit-narratives-box" class="hidden p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200 space-y-2.5">
+              <div class="text-[11px] font-extrabold text-indigo-900 uppercase">
+                Manual Narrative Override (Edits sync immediately to Preview &amp; PDF)
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">BAB I &mdash; Executive Summary</label>
+                  <textarea id="edit-nar-bab1" rows="3" oninput="ReportModule.onManualNarrativeEdit()"
+                    class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"></textarea>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">BAB II &mdash; Trend &amp; Pareto Explanation (Monthly)</label>
+                  <textarea id="edit-nar-bab2" rows="3" oninput="ReportModule.onManualNarrativeEdit()"
+                    class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"></textarea>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">BAB III &mdash; Fleet &amp; Model Evaluation (Monthly)</label>
+                  <textarea id="edit-nar-bab3" rows="3" oninput="ReportModule.onManualNarrativeEdit()"
+                    class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"></textarea>
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">BAB IV &mdash; Management Conclusion (Monthly)</label>
+                  <textarea id="edit-nar-bab4" rows="3" oninput="ReportModule.onManualNarrativeEdit()"
+                    class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"></textarea>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="flex items-center justify-between text-xs pt-1">
@@ -1276,6 +1316,30 @@
             <h3 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1">
               BAB I. RINGKASAN EKSEKUTIF &amp; PENCAPAIAN KPI ARMADA
             </h3>
+
+            <!-- Panduan Singkat Membaca Indikator KPI (Bahasa Awam — Khusus Mode Bulanan Manajemen) -->
+            <div id="rep-monthly-kpi-guide" class="p-3 rounded-lg bg-slate-50 border border-slate-300 text-[11px] text-slate-700 space-y-1">
+              <div class="font-extrabold text-slate-900 uppercase text-[10px]">
+                Panduan Membaca Indikator Kinerja Utama (KPI) Armada:
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-5 gap-2 pt-0.5">
+                <div class="bg-white p-2 rounded border border-slate-200">
+                  <strong class="text-blue-800">PA (Physical Availability):</strong> Persentase kesiapan fisik unit untuk bekerja dari total jam jadwal (tidak rusak).
+                </div>
+                <div class="bg-white p-2 rounded border border-slate-200">
+                  <strong class="text-emerald-800">MA (Mechanical Availability):</strong> Ketangguhan mekanis unit saat dioperasikan (rasio jam kerja vs kerusakan mendadak).
+                </div>
+                <div class="bg-white p-2 rounded border border-slate-200">
+                  <strong class="text-amber-800">UA (Use of Availability):</strong> Efektivitas tim operasi memanfaatkan unit yang sudah dinyatakan siap pakai (tidak standby).
+                </div>
+                <div class="bg-white p-2 rounded border border-slate-200">
+                  <strong class="text-slate-900">MTTR (Avg Repair Time):</strong> Rata-rata durasi waktu yang dibutuhkan mekanik untuk menyelesaikan 1 kali perbaikan.
+                </div>
+                <div class="bg-white p-2 rounded border border-slate-200">
+                  <strong class="text-indigo-800">MTBR (Avg Between BD):</strong> Rata-rata ketahanan jam operasi unit sebelum mengalami kerusakan mendadak berikutnya.
+                </div>
+              </div>
+            </div>
 
             <!-- 5 Kartu KPI Eksekutif -->
             <div class="grid grid-cols-5 gap-3">
@@ -1388,6 +1452,12 @@
                 <tbody id="rep-tbody-pareto-detail"></tbody>
               </table>
             </div>
+
+            <!-- Penjelasan AI BAB II (Khusus Mode Bulanan Manajemen Detail) -->
+            <div id="rep-monthly-bab2-box" class="p-3.5 rounded-lg border-l-4 border-l-indigo-600 bg-indigo-50/40 border border-indigo-200 space-y-1">
+              <div class="text-[11px] font-extrabold text-indigo-950 uppercase">2.2 Interpretasi Tren Harian &amp; Analisis Pareto (Hukum 80/20)</div>
+              <p id="rep-bab2-text" class="text-xs leading-relaxed text-slate-800">Memuat interpretasi analisis Pareto...</p>
+            </div>
           </div>
 
           <!-- BAB III: EVALUASI PERFORMA ARMADA & STATUS BREAKDOWN -->
@@ -1395,6 +1465,12 @@
             <h3 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1">
               BAB III. EVALUASI PERFORMA ARMADA &amp; STATUS BREAKDOWN AKTIF
             </h3>
+
+            <!-- Penjelasan AI BAB III (Khusus Mode Bulanan Manajemen Detail) -->
+            <div id="rep-monthly-bab3-box" class="p-3.5 rounded-lg border-l-4 border-l-emerald-600 bg-emerald-50/40 border border-emerald-200 space-y-1">
+              <div class="text-[11px] font-extrabold text-emerald-950 uppercase">3.0 Ringkasan Evaluasi Perbandingan Model, Unit Prioritas &amp; Stabilitas Populasi</div>
+              <p id="rep-bab3-text" class="text-xs leading-relaxed text-slate-800">Memuat evaluasi perbandingan performa armada...</p>
+            </div>
 
             <!-- 3.1 Unit Masih Status Breakdown -->
             <div class="border border-slate-300 rounded-lg overflow-hidden">
@@ -1439,6 +1515,7 @@
                   </tr>
                 </thead>
                 <tbody id="rep-tbody-model"></tbody>
+                <tfoot id="rep-tfoot-model" class="bg-slate-900 text-white font-bold"></tfoot>
               </table>
             </div>
 
@@ -1465,9 +1542,11 @@
                       <th class="px-2 py-1.5 text-right">MA (%)</th>
                       <th class="px-2 py-1.5 text-right">UA (%)</th>
                       <th class="px-2 py-1.5 text-right">MTTR</th>
+                      <th class="px-2 py-1.5 text-right">MTBR</th>
                     </tr>
                   </thead>
                   <tbody id="rep-tbody-daily-log"></tbody>
+                  <tfoot id="rep-tfoot-daily-log" class="bg-slate-900 text-white font-bold"></tfoot>
                 </table>
               </div>
             </div>
@@ -1528,8 +1607,14 @@
               BAB IV. KESIMPULAN, REKOMENDASI TINDAK LANJUT &amp; PENGESAHAN
             </h3>
 
+            <!-- Kesimpulan Manajemen BAB IV (Khusus Mode Bulanan Manajemen Detail) -->
+            <div id="rep-monthly-bab4-box" class="p-3.5 rounded-lg border-l-4 border-l-slate-800 bg-slate-100/80 border border-slate-300 space-y-1">
+              <div class="text-[11px] font-extrabold text-slate-900 uppercase">4.1 Kesimpulan Evaluasi Bulanan Manajemen</div>
+              <p id="rep-bab4-text" class="text-xs leading-relaxed text-slate-800">Memuat kesimpulan bulanan manajemen...</p>
+            </div>
+
             <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-300 space-y-2">
-              <div class="text-[11px] font-extrabold text-slate-800 uppercase">4.1 Rencana Tindak Lanjut Teknis (Action Plan):</div>
+              <div id="rep-action-plan-title" class="text-[11px] font-extrabold text-slate-800 uppercase">4.2 Rencana Tindak Lanjut Teknis (Action Plan):</div>
               <ul id="rep-recommendations-list" class="list-disc list-inside text-xs text-slate-700 space-y-1"></ul>
               <div id="rep-notes-box" class="hidden pt-2 border-t border-slate-200 text-xs text-slate-800">
                 <strong>Catatan Lapangan Khusus:</strong> <span id="rep-notes-text"></span>
@@ -1596,6 +1681,6 @@
   </div>
 
   <!-- External Application Logic Bundle (with version tag to bypass stale browser cache) -->
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
