@@ -26,15 +26,63 @@ function togglePasswordVisibility() {
   const eyeClosed = document.getElementById('icon-eye-closed');
   if (!passInput) return;
 
-  if (passInput.type === 'password') {
-    passInput.type = 'text';
-    if (eyeOpen) eyeOpen.classList.add('hidden');
-    if (eyeClosed) eyeClosed.classList.remove('hidden');
-  } else {
-    passInput.type = 'password';
-    if (eyeOpen) eyeOpen.classList.remove('hidden');
-    if (eyeClosed) eyeClosed.classList.add('hidden');
+  const isHidden = passInput.type === 'password';
+  passInput.type = isHidden ? 'text' : 'password';
+  if (eyeOpen && eyeClosed) {
+    eyeOpen.classList.toggle('hidden', isHidden);
+    eyeClosed.classList.toggle('hidden', !isHidden);
   }
+}
+
+/**
+ * Universal CSV Download Helper
+ * Uses 'sep=,' directive on line 1 so Microsoft Excel on Indonesian Windows
+ * automatically splits every column cleanly instead of merging into Column A.
+ */
+function downloadCsvFile(filename, headers, rows, btnElement = null) {
+  const originalHtml = btnElement ? btnElement.innerHTML : '';
+  if (btnElement) {
+    btnElement.disabled = true;
+    btnElement.innerHTML = `
+      <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+      </svg>
+      <span>Exporting CSV...</span>`;
+  }
+
+  setTimeout(() => {
+    try {
+      const escapeCell = (val) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      };
+
+      const csvLines = ['sep=,', headers.map(escapeCell).join(',')];
+      rows.forEach((row) => {
+        csvLines.push(row.map(escapeCell).join(','));
+      });
+
+      const csvContent = csvLines.join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } finally {
+      if (btnElement) {
+        setTimeout(() => {
+          btnElement.disabled = false;
+          btnElement.innerHTML = originalHtml;
+        }, 350);
+      }
+    }
+  }, 150);
 }
 
 /**
@@ -920,6 +968,7 @@ const DashboardModule = {
       return;
     }
 
+    const btn = document.getElementById('btn-dash-export-csv');
     const startDate = document.getElementById('dash-start-date')?.value || 'report';
     const endDate = document.getElementById('dash-end-date')?.value || '';
     const headers = ['Site', 'Period_From', 'Period_To', 'Unit_ID', 'Model', 'WH_Hrs', 'BD_Unsched_Hrs', 'BD_Sched_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
@@ -940,7 +989,7 @@ const DashboardModule = {
       u.mtbr.toFixed(2)
     ]);
 
-    downloadCsvFile(`MPS_KPI_Summary_${AuthModule.currentSite}_${startDate}_to_${endDate}.csv`, headers, rows);
+    downloadCsvFile(`MPS_KPI_Summary_${AuthModule.currentSite}_${startDate}_to_${endDate}.csv`, headers, rows, btn);
     showToast('KPI summary exported to CSV.', 'success');
   },
 
@@ -1168,6 +1217,7 @@ const HistoryModule = {
       return;
     }
 
+    const btn = document.getElementById('btn-hist-export-csv');
     const mode = document.getElementById('hist-view-mode')?.value || 'DAILY';
     const monthVal = this.data.month || 'history';
 
@@ -1176,117 +1226,253 @@ const HistoryModule = {
       const rows = (this.data.dailyHistory || []).map((r) => [
         AuthModule.currentSite, r.date, r.dayName, r.unitCount, r.calHrs, r.wh, r.bdUnsched, r.bdSched, r.rainHrs, r.stbyHrs, r.pa, r.ma, r.ua, r.mttr
       ]);
-      downloadCsvFile(`MPS_Daily_History_${AuthModule.currentSite}_${monthVal}.csv`, headers, rows);
+      downloadCsvFile(`MPS_Daily_History_${AuthModule.currentSite}_${monthVal}.csv`, headers, rows, btn);
     } else {
       const headers = ['Site', 'Date', 'Unit_ID', 'Model', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct'];
       const rows = (this.data.unitHistory || []).map((r) => [
         AuthModule.currentSite, r.date, r.unitId, r.model, r.calHrs, r.wh, r.bdUnsched, r.bdSched, r.rainHrs, r.stbyHrs, r.pa, r.ma, r.ua
       ]);
-      downloadCsvFile(`MPS_Unit_History_${AuthModule.currentSite}_${monthVal}.csv`, headers, rows);
+      downloadCsvFile(`MPS_Unit_History_${AuthModule.currentSite}_${monthVal}.csv`, headers, rows, btn);
     }
     showToast('KPI history exported to CSV.', 'success');
   }
 };
 
 /* ============================================================================
- * 4. UPLOAD BREAKDOWN REPORT MODULE
+ * 4. UPLOAD BREAKDOWN REPORT MODULE (DRAG & DROP, SHEET SELECT & DIAGNOSTICS)
  * ============================================================================ */
 const UploadExcelModule = {
+  workbook: null,
   parsedRows: [],
+  cachedMatrix: null,
+  showAllRows: false,
+  diagnostics: {
+    totalDataRows: 0,
+    unmatchedUnits: [],
+    excludedByDate: 0
+  },
 
   resetForm() {
+    this.workbook = null;
     this.parsedRows = [];
+    this.cachedMatrix = null;
+    this.showAllRows = false;
+    this.diagnostics = { totalDataRows: 0, unmatchedUnits: [], excludedByDate: 0 };
+
     const fileInput = document.getElementById('excel-file-input');
+    const sheetSelect = document.getElementById('excel-sheet-select');
     const fromInput = document.getElementById('excel-filter-from');
     const toInput = document.getElementById('excel-filter-to');
+    const searchInput = document.getElementById('excel-preview-search');
+    const dropTitle = document.getElementById('excel-drop-title');
+    const fileMeta = document.getElementById('excel-file-meta');
+    const diagBox = document.getElementById('excel-diagnostic-box');
     const cards = document.getElementById('excel-summary-cards');
+    const progressWrap = document.getElementById('excel-progress-wrap');
     const btnUpload = document.getElementById('btn-submit-excel');
     const statusBox = document.getElementById('upload-status-msg');
 
     if (fileInput) fileInput.value = '';
+    if (sheetSelect) {
+      sheetSelect.innerHTML = '<option value="">-- Load Excel File First --</option>';
+      sheetSelect.disabled = true;
+    }
     if (fromInput) fromInput.value = '';
     if (toInput) toInput.value = '';
+    if (searchInput) searchInput.value = '';
+    if (dropTitle) {
+      dropTitle.textContent = 'Click to browse or drag & drop Daily Report Machine (.xlsx / .xls) here';
+    }
+    if (fileMeta) {
+      fileMeta.textContent = 'Supports multi-sheet Excel workbooks • Automatically detects "Daily Report Machine" tab';
+    }
+    if (diagBox) diagBox.classList.add('hidden');
     if (cards) cards.classList.add('hidden');
-    if (btnUpload) btnUpload.disabled = true;
+    if (progressWrap) progressWrap.classList.add('hidden');
+    if (btnUpload) {
+      btnUpload.disabled = true;
+      btnUpload.textContent = 'Upload to Database';
+    }
     if (statusBox) {
-      statusBox.textContent = 'Select a Daily Machine Report file to begin.';
+      statusBox.textContent = 'Select or drop a Daily Machine Report file to begin.';
       statusBox.className = 'text-sm text-slate-500';
     }
     this.renderPreviewTable();
   },
 
-  handleFileSelect(event) {
-    const file = event.target.files[0];
-    const statusBox = document.getElementById('upload-status-msg');
-    const btnUpload = document.getElementById('btn-submit-excel');
-    if (!file) return;
+  handleDragOver(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const zone = document.getElementById('excel-drop-zone');
+    if (zone) {
+      zone.classList.add('border-blue-600', 'bg-blue-50/70');
+    }
+  },
 
-    if (typeof XLSX === 'undefined') {
-      statusBox.textContent = 'Error: Spreadsheet parser module is not loaded.';
-      statusBox.className = 'text-sm text-rose-600 font-semibold';
+  handleDragLeave(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const zone = document.getElementById('excel-drop-zone');
+    if (zone) {
+      zone.classList.remove('border-blue-600', 'bg-blue-50/70');
+    }
+  },
+
+  handleDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const zone = document.getElementById('excel-drop-zone');
+    if (zone) {
+      zone.classList.remove('border-blue-600', 'bg-blue-50/70');
+    }
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.processFile(files[0]);
+    }
+  },
+
+  handleFileSelect(event) {
+    const file = event.target?.files?.[0];
+    if (file) {
+      this.processFile(file);
+    }
+  },
+
+  processFile(file) {
+    const statusBox = document.getElementById('upload-status-msg');
+    const dropTitle = document.getElementById('excel-drop-title');
+    const fileMeta = document.getElementById('excel-file-meta');
+    const sheetSelect = document.getElementById('excel-sheet-select');
+    const btnUpload = document.getElementById('btn-submit-excel');
+
+    if (!/\.(xlsx|xls)$/i.test(file.name)) {
+      showToast('Please select a valid Excel file (.xlsx or .xls).', 'error');
       return;
     }
 
-    statusBox.textContent = `Parsing "${file.name}"...`;
-    statusBox.className = 'text-sm text-blue-600 font-medium';
+    if (typeof XLSX === 'undefined') {
+      if (statusBox) {
+        statusBox.textContent = 'Error: Spreadsheet parser module is not loaded.';
+        statusBox.className = 'text-sm text-rose-600 font-semibold';
+      }
+      return;
+    }
+
+    const sizeKb = (file.size / 1024).toFixed(1);
+    if (dropTitle) dropTitle.textContent = `Loaded File: ${file.name}`;
+    if (fileMeta) fileMeta.textContent = `File Size: ${sizeKb} KB • Reading worksheets...`;
+    if (statusBox) {
+      statusBox.textContent = `Parsing "${file.name}"...`;
+      statusBox.className = 'text-sm text-blue-600 font-medium';
+    }
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
-        const targetSheetName = workbook.SheetNames.includes('Daily Report Machine')
-          ? 'Daily Report Machine'
-          : workbook.SheetNames[0];
+        this.workbook = XLSX.read(data, { type: 'array', cellDates: true });
 
-        const worksheet = workbook.Sheets[targetSheetName];
-        const rawMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
-
-        this.extractBreakdownRows(rawMatrix);
-        this.updateSummaryCards();
-        this.renderPreviewTable();
-
-        if (this.parsedRows.length > 0) {
-          statusBox.textContent = `Parsed ${this.parsedRows.length} valid daily breakdown segments for site ${AuthModule.currentSite}. Ready to upload.`;
-          statusBox.className = 'text-sm text-emerald-600 font-semibold';
-          if (btnUpload) btnUpload.disabled = false;
-        } else {
-          statusBox.textContent = `No breakdown rows matched active units in site ${AuthModule.currentSite}.`;
-          statusBox.className = 'text-sm text-amber-600 font-semibold';
-          if (btnUpload) btnUpload.disabled = true;
+        const names = this.workbook.SheetNames || [];
+        if (names.length === 0) {
+          throw new Error('No worksheets found inside this Excel file.');
         }
+
+        const defaultSheet = names.includes('Daily Report Machine')
+          ? 'Daily Report Machine'
+          : names[0];
+
+        if (sheetSelect) {
+          sheetSelect.innerHTML = names
+            .map((n) => `<option value="${n}" ${n === defaultSheet ? 'selected' : ''}>${n}</option>`)
+            .join('');
+          sheetSelect.disabled = false;
+        }
+
+        if (fileMeta) {
+          fileMeta.textContent = `File Size: ${sizeKb} KB • ${names.length} Worksheet(s) detected`;
+        }
+
+        this.onSheetChange(defaultSheet);
       } catch (err) {
-        statusBox.textContent = 'Failed to parse report file: ' + err.message;
-        statusBox.className = 'text-sm text-rose-600 font-semibold';
+        if (statusBox) {
+          statusBox.textContent = 'Failed to parse report file: ' + err.message;
+          statusBox.className = 'text-sm text-rose-600 font-semibold';
+        }
+        if (btnUpload) btnUpload.disabled = true;
       }
     };
     reader.readAsArrayBuffer(file);
   },
 
+  onSheetChange(sheetName) {
+    if (!this.workbook || !sheetName) return;
+    const worksheet = this.workbook.Sheets[sheetName];
+    if (!worksheet) return;
+
+    this.cachedMatrix = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+    this.reprocessCachedSheet();
+  },
+
+  reprocessCachedSheet() {
+    if (!this.cachedMatrix) return;
+    const statusBox = document.getElementById('upload-status-msg');
+    const btnUpload = document.getElementById('btn-submit-excel');
+
+    try {
+      this.extractBreakdownRows(this.cachedMatrix);
+      this.updateSummaryCards();
+      this.renderDiagnostics();
+      this.renderPreviewTable();
+
+      if (this.parsedRows.length > 0) {
+        if (statusBox) {
+          statusBox.textContent = `Parsed ${this.parsedRows.length} valid daily breakdown segments for site ${AuthModule.currentSite}. Ready to upload.`;
+          statusBox.className = 'text-sm text-emerald-600 font-semibold';
+        }
+        if (btnUpload) btnUpload.disabled = false;
+      } else {
+        if (statusBox) {
+          statusBox.textContent = `No breakdown rows matched active units / date filter in site ${AuthModule.currentSite}.`;
+          statusBox.className = 'text-sm text-amber-600 font-semibold';
+        }
+        if (btnUpload) btnUpload.disabled = true;
+      }
+    } catch (err) {
+      if (statusBox) {
+        statusBox.textContent = 'Sheet structure error: ' + err.message;
+        statusBox.className = 'text-sm text-rose-600 font-semibold';
+      }
+      if (btnUpload) btnUpload.disabled = true;
+    }
+  },
+
   extractBreakdownRows(matrix) {
     this.parsedRows = [];
+    this.diagnostics = { totalDataRows: 0, unmatchedUnits: [], excludedByDate: 0 };
     if (!matrix || matrix.length < 2) return;
 
     let headerRowIdx = -1;
     let colIdx = {};
 
-    for (let r = 0; r < Math.min(15, matrix.length); r++) {
+    for (let r = 0; r < Math.min(25, matrix.length); r++) {
       const row = matrix[r];
       if (!row) continue;
       const normalized = row.map((cell) => String(cell || '').trim().toLowerCase());
-      if (normalized.includes('unit') && normalized.includes('in')) {
+      const unitCol = normalized.findIndex((h) => h === 'unit' || h === 'unit id' || h === 'unit no' || h === 'cn');
+      const inCol = normalized.findIndex((h) => h === 'in' || h === 'time in');
+      if (unitCol !== -1 && inCol !== -1) {
         headerRowIdx = r;
         colIdx = {
-          tanggal: normalized.findIndex((h) => h.startsWith('tanggal')),
+          tanggal: normalized.findIndex((h) => h.startsWith('tanggal') || h === 'date'),
           wo: normalized.indexOf('wo'),
-          unit: normalized.indexOf('unit'),
+          unit: unitCol,
           model: normalized.indexOf('model'),
           location: normalized.indexOf('location'),
           code: normalized.indexOf('code'),
           problem: normalized.indexOf('problem'),
           finishDate: normalized.findIndex((h) => h.includes('finis') || h.includes('finish')),
-          timeIn: normalized.indexOf('in'),
-          timeOut: normalized.indexOf('out'),
+          timeIn: inCol,
+          timeOut: normalized.findIndex((h) => h === 'out' || h === 'time out'),
           codeComp: normalized.findIndex((h) => h.includes('code component'))
         };
         break;
@@ -1294,14 +1480,16 @@ const UploadExcelModule = {
     }
 
     if (headerRowIdx === -1) {
-      throw new Error('Required columns "Unit" and "IN" were not found in the report.');
+      throw new Error('Required columns "Unit" and "IN" were not found in the selected worksheet.');
     }
 
+    const normId = (s) => String(s || '').trim().toUpperCase().replace(/[\s\-_]+/g, '');
     const validUnitMap = {};
     (AuthModule.masterData.units || []).forEach((u) => {
-      validUnitMap[String(u.unitId).trim()] = u.model;
+      validUnitMap[normId(u.unitId)] = { exactId: u.unitId, model: u.model };
     });
 
+    const unmatchedSet = new Set();
     const filterFrom = document.getElementById('excel-filter-from')?.value || '';
     const filterTo = document.getElementById('excel-filter-to')?.value || '';
     const todayYMD = this.formatExcelDate(new Date());
@@ -1310,19 +1498,26 @@ const UploadExcelModule = {
       const row = matrix[r];
       if (!row) continue;
 
-      const unitId = String(row[colIdx.unit] || '').trim();
-      if (!unitId || !validUnitMap[unitId]) continue;
-
+      const rawUnit = String(row[colIdx.unit] || '').trim();
       const startDate = this.formatExcelDate(row[colIdx.tanggal]);
       const timeIn = this.formatExcelTime(row[colIdx.timeIn]);
-      if (!startDate || !timeIn) continue;
+      if (!rawUnit || !startDate || !timeIn) continue;
 
+      this.diagnostics.totalDataRows += 1;
+
+      const matchedUnit = validUnitMap[normId(rawUnit)];
+      if (!matchedUnit) {
+        unmatchedSet.add(rawUnit.toUpperCase());
+        continue;
+      }
+
+      const unitId = matchedUnit.exactId;
       const rawFinishDate = colIdx.finishDate !== -1 ? this.formatExcelDate(row[colIdx.finishDate]) : '';
       const rawTimeOut = colIdx.timeOut !== -1 ? this.formatExcelTime(row[colIdx.timeOut]) : '';
       const isReady = Boolean(rawFinishDate && rawTimeOut);
       const endDate = rawFinishDate || todayYMD;
 
-      const model = (colIdx.model !== -1 ? String(row[colIdx.model] || '').trim() : '') || validUnitMap[unitId];
+      const model = (colIdx.model !== -1 ? String(row[colIdx.model] || '').trim() : '') || matchedUnit.model;
       const wo = colIdx.wo !== -1 ? String(row[colIdx.wo] || '').trim() : '';
       const location = colIdx.location !== -1 ? String(row[colIdx.location] || '').trim() : '';
       const code = colIdx.code !== -1 ? String(row[colIdx.code] || 'USCH').trim().toUpperCase() : 'USCH';
@@ -1331,8 +1526,10 @@ const UploadExcelModule = {
 
       const segments = this.splitDailySegments(startDate, timeIn, endDate, rawTimeOut, isReady);
       segments.forEach((seg) => {
-        if (filterFrom && seg.date < filterFrom) return;
-        if (filterTo && seg.date > filterTo) return;
+        if ((filterFrom && seg.date < filterFrom) || (filterTo && seg.date > filterTo)) {
+          this.diagnostics.excludedByDate += 1;
+          return;
+        }
 
         this.parsedRows.push({
           startDate: seg.date,
@@ -1349,6 +1546,42 @@ const UploadExcelModule = {
           codeComponent: codeComponent
         });
       });
+    }
+
+    this.diagnostics.unmatchedUnits = Array.from(unmatchedSet).sort();
+  },
+
+  renderDiagnostics() {
+    const diagBox = document.getElementById('excel-diagnostic-box');
+    const diagTitle = document.getElementById('excel-diag-title');
+    const diagBody = document.getElementById('excel-diag-body');
+    if (!diagBox || !diagTitle || !diagBody) return;
+
+    const session = getUserSession();
+    const { totalDataRows, unmatchedUnits, excludedByDate } = this.diagnostics;
+
+    if (session && session.isPreviewMode && totalDataRows > 0 && this.parsedRows.length === 0) {
+      diagBox.classList.remove('hidden');
+      diagTitle.textContent = 'Live UI Demo Mode Active';
+      diagBody.textContent = `Read ${totalDataRows} rows from Excel, but you are currently in Live UI Demo Mode (which only simulates 4 sample units: EX-1320, EX-1351, DT-4012, DZ-85). Sign in with your real account to match your site ${AuthModule.currentSite} fleet.`;
+      return;
+    }
+
+    if (unmatchedUnits.length > 0 || (totalDataRows > 0 && this.parsedRows.length === 0)) {
+      diagBox.classList.remove('hidden');
+      diagTitle.textContent = `Workbook Parsing Summary (${totalDataRows} Data Rows Scanned)`;
+      const msgs = [];
+      if (unmatchedUnits.length > 0) {
+        const previewList = unmatchedUnits.slice(0, 12).join(', ');
+        const more = unmatchedUnits.length > 12 ? ` (+${unmatchedUnits.length - 12} more)` : '';
+        msgs.push(`Skipped ${unmatchedUnits.length} Unit ID(s) not active in site ${AuthModule.currentSite} (check Unit Population or selected Site): ${previewList}${more}.`);
+      }
+      if (excludedByDate > 0) {
+        msgs.push(`${excludedByDate} daily segment(s) excluded by the From/To Date filter.`);
+      }
+      diagBody.textContent = msgs.join(' ');
+    } else {
+      diagBox.classList.add('hidden');
     }
   },
 
@@ -1429,29 +1662,90 @@ const UploadExcelModule = {
     }
 
     cards.classList.remove('hidden');
-    const totalHrs = this.parsedRows.reduce((acc, r) => acc + (Number(r.pureHours) || 0), 0);
+    const schedCodes = ['SCH', 'SVC'];
+    let unschHrs = 0;
+    let schHrs = 0;
+
+    this.parsedRows.forEach((r) => {
+      const hrs = Number(r.pureHours) || 0;
+      if (schedCodes.includes(String(r.code || '').toUpperCase())) {
+        schHrs += hrs;
+      } else {
+        unschHrs += hrs;
+      }
+    });
+
     const uniqueUnits = new Set(this.parsedRows.map((r) => r.unitId)).size;
 
     document.getElementById('excel-sum-rows').textContent = `${this.parsedRows.length} Rows`;
-    document.getElementById('excel-sum-hours').textContent = `${totalHrs.toFixed(2)} Hrs`;
+    document.getElementById('excel-sum-unsch').textContent = `${unschHrs.toFixed(2)} Hrs`;
+    document.getElementById('excel-sum-sch').textContent = `${schHrs.toFixed(2)} Hrs`;
     document.getElementById('excel-sum-units').textContent = `${uniqueUnits} Units`;
+  },
+
+  toggleShowAllRows() {
+    this.showAllRows = !this.showAllRows;
+    this.renderPreviewTable();
   },
 
   renderPreviewTable() {
     const tbody = document.getElementById('tbody-excel-preview');
+    const heading = document.getElementById('excel-preview-heading');
+    const btnToggle = document.getElementById('btn-excel-toggle-rows');
+    const keyword = String(document.getElementById('excel-preview-search')?.value || '').trim().toLowerCase();
     if (!tbody) return;
 
     if (this.parsedRows.length === 0) {
+      if (heading) heading.textContent = 'Daily Breakdown Segments Preview (Latest 50 Rows)';
+      if (btnToggle) btnToggle.classList.add('hidden');
       tbody.innerHTML = `
         <tr>
           <td colspan="9" class="px-4 py-6 text-center text-sm text-slate-400">
-            No report file processed yet. Select an .xlsx file above to preview daily segments.
+            No report file processed yet. Select or drop an .xlsx file above to preview daily segments.
           </td>
         </tr>`;
       return;
     }
 
-    const previewSlice = this.parsedRows.slice(-50).reverse();
+    const filtered = this.parsedRows.filter((item) => {
+      if (!keyword) return true;
+      return (
+        item.unitId.toLowerCase().includes(keyword) ||
+        item.code.toLowerCase().includes(keyword) ||
+        (item.codeComponent || '').toLowerCase().includes(keyword) ||
+        (item.problem || '').toLowerCase().includes(keyword) ||
+        item.startDate.includes(keyword)
+      );
+    });
+
+    if (btnToggle) {
+      if (filtered.length > 50) {
+        btnToggle.classList.remove('hidden');
+        btnToggle.textContent = this.showAllRows ? 'Show Latest 50' : `Show All (${filtered.length} Rows)`;
+      } else {
+        btnToggle.classList.add('hidden');
+      }
+    }
+
+    const ordered = [...filtered].reverse();
+    const previewSlice = this.showAllRows ? ordered : ordered.slice(0, 50);
+
+    if (heading) {
+      heading.textContent = this.showAllRows
+        ? `Daily Breakdown Segments Preview (Showing All ${previewSlice.length} Rows)`
+        : `Daily Breakdown Segments Preview (Showing ${previewSlice.length} of ${filtered.length} Rows)`;
+    }
+
+    if (previewSlice.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="9" class="px-4 py-6 text-center text-sm text-slate-400">
+            No breakdown segments match your search filter.
+          </td>
+        </tr>`;
+      return;
+    }
+
     tbody.innerHTML = previewSlice
       .map((item) => {
         const isOpen = !item.finishDate || !item.timeOut;
@@ -1475,42 +1769,23 @@ const UploadExcelModule = {
       .join('');
   },
 
-  exportCsv() {
-    if (this.parsedRows.length === 0) {
-      showToast('No parsed breakdown segments to export.', 'warning');
-      return;
-    }
-    const headers = ['Site', 'Date', 'Unit_ID', 'Model', 'WO', 'Code', 'Status', 'Time_IN', 'Finish_Date', 'Time_OUT', 'Pure_BD_Hrs', 'Component', 'Location', 'Problem'];
-    const rows = this.parsedRows.map((r) => [
-      AuthModule.currentSite,
-      r.startDate,
-      r.unitId,
-      r.model,
-      r.wo,
-      r.code,
-      r.finishDate && r.timeOut ? 'Ready' : 'Breakdown',
-      r.timeIn,
-      r.finishDate,
-      r.timeOut,
-      Number(r.pureHours).toFixed(2),
-      r.codeComponent,
-      r.location,
-      r.problem
-    ]);
-    downloadCsvFile(`MPS_Breakdown_Segments_${AuthModule.currentSite}.csv`, headers, rows);
-    showToast('Breakdown segments exported to CSV.', 'success');
-  },
-
   async submitToServer() {
     if (this.parsedRows.length === 0) return;
 
     const btnUpload = document.getElementById('btn-submit-excel');
     const statusBox = document.getElementById('upload-status-msg');
+    const progressWrap = document.getElementById('excel-progress-wrap');
+    const progressBar = document.getElementById('excel-progress-bar');
+    const progressPct = document.getElementById('excel-progress-pct');
+    const progressLabel = document.getElementById('excel-progress-label');
 
     if (btnUpload) {
       btnUpload.disabled = true;
       btnUpload.textContent = 'Uploading to Central Database...';
     }
+    if (progressWrap) progressWrap.classList.remove('hidden');
+    if (progressBar) progressBar.style.width = '5%';
+    if (progressPct) progressPct.textContent = '5%';
 
     const batchSize = 150;
     let totalInserted = 0;
@@ -1519,9 +1794,18 @@ const UploadExcelModule = {
 
     for (let i = 0; i < this.parsedRows.length; i += batchSize) {
       const chunk = this.parsedRows.slice(i, i + batchSize);
-      const progress = Math.min(i + batchSize, this.parsedRows.length);
-      statusBox.textContent = `Uploading ${progress} of ${this.parsedRows.length} segments to Central Fleet Database...`;
-      statusBox.className = 'text-sm text-blue-600 font-medium';
+      const processedCount = Math.min(i + batchSize, this.parsedRows.length);
+      const pct = Math.round((processedCount / this.parsedRows.length) * 100);
+
+      if (progressBar) progressBar.style.width = `${pct}%`;
+      if (progressPct) progressPct.textContent = `${pct}%`;
+      if (progressLabel) {
+        progressLabel.textContent = `Uploading ${processedCount} of ${this.parsedRows.length} segments to Central Fleet Database...`;
+      }
+      if (statusBox) {
+        statusBox.textContent = `Processing batch (${processedCount}/${this.parsedRows.length})...`;
+        statusBox.className = 'text-sm text-blue-600 font-medium';
+      }
 
       const res = await callBackendApi('UPLOAD_BREAKDOWN_BATCH', {
         site: AuthModule.currentSite,
@@ -1529,8 +1813,10 @@ const UploadExcelModule = {
       });
 
       if (res.status !== 'success') {
-        statusBox.textContent = `Upload stopped at row ${i + 1}: ${res.message}`;
-        statusBox.className = 'text-sm text-rose-600 font-semibold';
+        if (statusBox) {
+          statusBox.textContent = `Upload stopped at row ${i + 1}: ${res.message}`;
+          statusBox.className = 'text-sm text-rose-600 font-semibold';
+        }
         if (btnUpload) {
           btnUpload.disabled = false;
           btnUpload.textContent = 'Upload to Database';
@@ -1545,8 +1831,11 @@ const UploadExcelModule = {
       }
     }
 
-    statusBox.textContent = `Success! ${totalInserted} new segments added, ${totalUpdated} updated, ${totalSkipped} skipped. KPI metrics recalculated.`;
-    statusBox.className = 'text-sm text-emerald-600 font-semibold';
+    if (progressLabel) progressLabel.textContent = 'Upload complete & KPI metrics recalculated.';
+    if (statusBox) {
+      statusBox.textContent = `Success! ${totalInserted} new segments added, ${totalUpdated} updated, ${totalSkipped} skipped. KPI metrics recalculated.`;
+      statusBox.className = 'text-sm text-emerald-600 font-semibold';
+    }
     showToast('Breakdown report uploaded and KPI recalculated.', 'success');
 
     if (btnUpload) {
@@ -2171,6 +2460,7 @@ const InputHmModule = {
       return;
     }
 
+    const btn = document.getElementById('btn-hm-export-csv');
     const headers = ['Site', 'Operational_Date', 'Shift', 'Unit_ID', 'Model', 'Start_HM', 'End_HM', 'WH_Hrs', 'Shift_Rain_Hrs'];
     const rows = [];
 
@@ -2192,7 +2482,7 @@ const InputHmModule = {
       });
     });
 
-    downloadCsvFile(`MPS_Daily_HM_${AuthModule.currentSite}_${this.selectedDate}.csv`, headers, rows);
+    downloadCsvFile(`MPS_Daily_HM_${AuthModule.currentSite}_${this.selectedDate}.csv`, headers, rows, btn);
     showToast('Daily HM input exported to CSV.', 'success');
   },
 
@@ -2400,11 +2690,12 @@ const PopulationModule = {
       return;
     }
 
+    const btn = document.getElementById('btn-pop-export-csv');
     const headers = ['Site', 'Unit_ID', 'Category', 'Equipment', 'Brand', 'Model', 'Population_Status'];
     const rows = allUnits.map((u) => [
       AuthModule.currentSite, u.unitId, u.category, u.equipment, u.brand, u.model, u.status
     ]);
-    downloadCsvFile(`MPS_Unit_Population_${AuthModule.currentSite}.csv`, headers, rows);
+    downloadCsvFile(`MPS_Unit_Population_${AuthModule.currentSite}.csv`, headers, rows, btn);
     showToast('Fleet population exported to CSV.', 'success');
   },
 
@@ -2926,6 +3217,33 @@ const ReportModule = {
   },
 
   /**
+   * Loads logo-ktc.png into Base64 PNG for embedding inside jsPDF header
+   */
+  loadLogoDataUrl(src) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || 120;
+          canvas.height = img.naturalHeight || 120;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve({
+            dataUrl: canvas.toDataURL('image/png'),
+            ratio: canvas.width / canvas.height
+          });
+        } catch (e) {
+          resolve(null);
+        }
+      };
+      img.onerror = () => resolve(null);
+      img.src = src;
+    });
+  },
+
+  /**
    * Direct A4 Landscape Formal Paper PDF Generator (jsPDF + AutoTable)
    * Bypasses browser window.print() blocking and downloads an official .pdf file directly.
    */
@@ -2945,6 +3263,7 @@ const ReportModule = {
     }
 
     try {
+      const logoAsset = await this.loadLogoDataUrl('logo-ktc.png');
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const pageW = doc.internal.pageSize.getWidth();   // 297 mm
@@ -2964,10 +3283,20 @@ const ReportModule = {
       doc.setFillColor(15, 23, 42);
       doc.rect(margin, 10, contentW, 20, 'F');
 
+      let headerTextX = margin + 4;
+      if (logoAsset && logoAsset.dataUrl) {
+        const logoH = 14;
+        const logoW = Math.min(26, logoH * (logoAsset.ratio || 1));
+        doc.setFillColor(255, 255, 255);
+        doc.roundedRect(margin + 3, 13, logoW + 2, logoH, 1.2, 1.2, 'F');
+        doc.addImage(logoAsset.dataUrl, 'PNG', margin + 4, 13.8, logoW, logoH - 1.6);
+        headerTextX = margin + logoW + 8;
+      }
+
       doc.setTextColor(96, 165, 250);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
-      doc.text('PT. KTC COAL MINING & ENERGY  |  PLANT & WORKSHOP RELIABILITY DIVISION', margin + 4, 16);
+      doc.text('PT. KTC COAL MINING & ENERGY  |  PLANT & WORKSHOP RELIABILITY DIVISION', headerTextX, 16);
 
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(12.5);
@@ -2975,7 +3304,7 @@ const ReportModule = {
         isWeekly
           ? 'LAPORAN MINGGUAN OPERASIONAL & KESIAPAN ARMADA'
           : 'LAPORAN BULANAN EKSEKUTIF PERFORMA & RELIABILITAS ARMADA',
-        margin + 4,
+        headerTextX,
         22.5
       );
 
@@ -2984,7 +3313,7 @@ const ReportModule = {
       doc.setTextColor(203, 213, 225);
       doc.text(
         `Site: ${this.kpiData.site}  |  Model: ${model === 'ALL' ? 'Semua Model' : model}  |  Periode: ${startDate} s/d ${endDate}  |  Penyusun: ${session?.fullName || session?.username || 'Planner'}`,
-        margin + 4,
+        headerTextX,
         27.5
       );
 
