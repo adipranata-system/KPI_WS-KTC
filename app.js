@@ -253,7 +253,11 @@ async function refreshCurrentView() {
   if (icon) icon.classList.add('animate-spin');
 
   await AuthModule.loadMasterData(AuthModule.currentSite);
-  await switchAppTab(activeTabId);
+  if (activeTabId === 'tab-upload-bd') {
+    UploadExcelModule.resetForm();
+  } else {
+    await switchAppTab(activeTabId);
+  }
 
   if (icon) icon.classList.remove('animate-spin');
   showToast(`Latest data refreshed for site ${AuthModule.currentSite}.`, 'info');
@@ -472,7 +476,11 @@ const AuthModule = {
 
     this.currentSite = cleanNew;
     await this.loadMasterData(this.currentSite);
-    switchAppTab(activeTabId);
+    if (activeTabId === 'tab-upload-bd') {
+      UploadExcelModule.resetForm();
+    } else {
+      switchAppTab(activeTabId);
+    }
     showToast(`Switched active site to ${this.currentSite}.`, 'info');
   },
 
