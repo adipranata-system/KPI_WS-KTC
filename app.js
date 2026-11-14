@@ -4745,6 +4745,25 @@ function getDemoApiResponse(action, payload, session) {
     const dt = payload.date || '2026-11-14';
     const parts = dt.split('-').map(Number);
     const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const isFri = dObj.getDay() === 5;
+    return {
+      status: 'success',
+      site: site,
+      date: dt,
+      dayName: days[dObj.getDay()],
+      isFriday: isFri,
+      shifts: {
+        DAY: { isWorking: true, standardHours: isFri ? 9 : 10, rainHours: 0 },
+        NIGHT: { isWorking: true, standardHours: 10, rainHours: 0 }
+      },
+      operations: { DAY: [], NIGHT: [] },
+      lastHmMap: { 'EX-1320': 14250.5, 'EX-1351': 11890.0, 'DT-4012': 22410.0 },
+      breakdownMap: { DAY: {}, NIGHT: {} },
+      monthlyStatus: { '2026-11-12': 'COMPLETE', '2026-11-13': 'COMPLETE', '2026-11-14': 'BD_ONLY' }
+    };
+  }
+
   if (action === 'GENERATE_AI_REPORT') {
     const startDate = payload.startDate || '2026-11-01';
     const endDate = payload.endDate || '2026-11-14';
