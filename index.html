@@ -914,25 +914,71 @@
       <!-- ===================================================== -->
       <section id="tab-population" class="app-tab-panel hidden space-y-5">
 
+        <!-- Monthly Roster Period & Lock Status Control -->
+        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex flex-wrap items-center gap-3">
+              <div>
+                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Roster Period (Month)</label>
+                <input type="month" id="pop-month-picker" onchange="PopulationModule.loadMonth()"
+                  class="px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+              </div>
+
+              <div class="pt-4 sm:pt-0 flex flex-wrap items-center gap-2">
+                <span id="pop-lock-badge" class="px-3 py-1.5 text-xs font-extrabold rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+                  Loading Roster Status...
+                </span>
+                <span id="pop-inherited-info" class="text-[11px] text-slate-500 font-medium"></span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="btn-copy-prev-roster" onclick="PopulationModule.copyPreviousRoster()"
+                class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-sm transition">
+                Copy / Finalize from Previous Month
+              </button>
+            </div>
+          </div>
+
+          <div id="pop-lock-banner" class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2">
+            <span class="font-bold text-blue-600">&#9432;</span>
+            <p id="pop-lock-desc" class="leading-relaxed">
+              Select a roster month to manage On-Hired (W/SW) and Off-Hired (OH) fleet allocation.
+            </p>
+          </div>
+        </div>
+
         <div id="pop-status-msg" class="text-sm"></div>
 
-        <!-- Fleet Status Count Cards -->
+        <!-- 4 Fleet Status Summary Cards (On-Hired vs Off-Hired) -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="bg-white p-3 rounded-xl border border-emerald-200 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-600">Working (W)</span>
-            <span id="pop-count-w" class="text-lg font-extrabold text-emerald-600">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Working (W)</div>
+              <div class="text-[10px] font-semibold text-emerald-700">On-Hired &bull; Active KPI</div>
+            </div>
+            <span id="pop-count-w" class="text-xl font-extrabold text-emerald-600">0</span>
           </div>
-          <div class="bg-white p-3 rounded-xl border border-blue-200 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-600">Standby Working (SW)</span>
-            <span id="pop-count-sw" class="text-lg font-extrabold text-blue-600">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-blue-200 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Standby Working (SW)</div>
+              <div class="text-[10px] font-semibold text-blue-700">On-Hired &bull; Hot Spare KPI</div>
+            </div>
+            <span id="pop-count-sw" class="text-xl font-extrabold text-blue-600">0</span>
           </div>
-          <div class="bg-white p-3 rounded-xl border border-amber-200 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-600">Repair (R)</span>
-            <span id="pop-count-r" class="text-lg font-extrabold text-amber-600">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-amber-200 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Off Hired (OH)</div>
+              <div class="text-[10px] font-semibold text-amber-700">Yard / Long BD &bull; Excluded</div>
+            </div>
+            <span id="pop-count-oh" class="text-xl font-extrabold text-amber-600">0</span>
           </div>
-          <div class="bg-white p-3 rounded-xl border border-rose-200 flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-600">Scrap / Inactive (S)</span>
-            <span id="pop-count-s" class="text-lg font-extrabold text-rose-600">0</span>
+          <div class="bg-white p-3.5 rounded-xl border border-rose-200 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-800">Scrap / Demob (S)</div>
+              <div class="text-[10px] font-semibold text-rose-700">Inactive &bull; Excluded</div>
+            </div>
+            <span id="pop-count-s" class="text-xl font-extrabold text-rose-600">0</span>
           </div>
         </div>
 
@@ -940,11 +986,11 @@
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-center gap-2">
-              <h3 class="text-sm font-bold text-slate-800">Site Unit Population Registry</h3>
-              <span id="pop-total-badge" class="px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">0 Units</span>
+              <h3 class="text-sm font-bold text-slate-800">Monthly Fleet Roster &amp; Population</h3>
+              <span id="pop-total-badge" class="px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">0 On-Hired</span>
               <button type="button" id="btn-pull-master" onclick="PopulationModule.pullFromMaster()"
                 class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition">
-                Sync from Master Data
+                Sync Roster
               </button>
               <button type="button" id="btn-pop-export-csv" onclick="PopulationModule.exportCsv()"
                 class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer">
@@ -956,17 +1002,19 @@
               <select id="pop-status-filter" onchange="PopulationModule.renderTable()"
                 class="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white">
                 <option value="ALL">All Statuses</option>
-                <option value="W">Status W</option>
-                <option value="SW">Status SW</option>
-                <option value="R">Status R</option>
-                <option value="S">Status S</option>
+                <option value="ON_HIRED">On-Hired Only (W + SW)</option>
+                <option value="W">W (Working)</option>
+                <option value="SW">SW (Standby Working)</option>
+                <option value="OH">OH (Off Hired)</option>
+                <option value="S">S (Scrap)</option>
+                <option value="PENDING_OH">Pending Off-Hire</option>
               </select>
               <input type="text" id="pop-search-input" oninput="PopulationModule.renderTable()"
                 placeholder="Search Unit ID / Model / Brand..."
                 class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
               <button type="button" id="btn-save-bulk-status" onclick="PopulationModule.saveBulkStatus()"
-                class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow transition">
-                Save Status Changes
+                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow transition">
+                Save Roster Changes
               </button>
             </div>
           </div>
@@ -979,14 +1027,102 @@
                   <th class="px-4 py-2.5">Equipment</th>
                   <th class="px-4 py-2.5">Brand</th>
                   <th class="px-4 py-2.5">Model</th>
-                  <th class="px-4 py-2.5">Population Status</th>
+                  <th class="px-4 py-2.5">Roster Status</th>
+                  <th class="px-4 py-2.5">Mid-Month Governance / Notes</th>
                 </tr>
               </thead>
               <tbody id="tbody-population-list"></tbody>
             </table>
           </div>
         </div>
+
+        <!-- Audit Log Mutasi Unit Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800">Fleet Roster Mutation Audit Log</h3>
+              <p class="text-[11px] text-slate-500">Permanent audit trail of Pending Off-Hire requests, Emergency Pull-Ins, and monthly roster locks</p>
+            </div>
+            <span id="pop-audit-count" class="px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded-full">0 Logs</span>
+          </div>
+          <div class="overflow-x-auto max-h-64">
+            <table class="w-full text-left border-collapse">
+              <thead class="sticky top-0 bg-slate-50 shadow-sm">
+                <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                  <th class="px-3 py-2">Timestamp</th>
+                  <th class="px-3 py-2">Planner / User</th>
+                  <th class="px-3 py-2">Unit ID</th>
+                  <th class="px-3 py-2">Action Type</th>
+                  <th class="px-3 py-2">Technical Justification &amp; Replacement Detail</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-pop-audit-logs">
+                <tr>
+                  <td colspan="5" class="px-4 py-5 text-center text-xs text-slate-400">No roster mutations recorded for this period.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
+
+      <!-- Mid-Month One-Way Roster Governance Modal -->
+      <div id="modal-roster-action" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+          <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div>
+              <h3 id="modal-roster-title" class="text-sm font-extrabold uppercase tracking-wide">Roster Governance Action</h3>
+              <p id="modal-roster-subtitle" class="text-[11px] text-slate-300 mt-0.5">One-Way Mid-Month Roster Rule</p>
+            </div>
+            <button type="button" onclick="PopulationModule.closeActionModal()" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
+          </div>
+
+          <div class="p-5 space-y-4 text-xs">
+            <input type="hidden" id="modal-roster-unit-id" />
+            <input type="hidden" id="modal-roster-mode" />
+
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Selected Unit:</span>
+              <span id="modal-roster-unit-label" class="font-extrabold text-slate-900 text-sm">-</span>
+            </div>
+
+            <div id="modal-roster-pull-fields" class="hidden space-y-3">
+              <div>
+                <label class="block font-bold text-slate-700 uppercase mb-1">Activate As Status</label>
+                <select id="modal-roster-target-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white">
+                  <option value="W">W (Working - Active Production)</option>
+                  <option value="SW">SW (Standby Working - Hot Spare)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block font-bold text-slate-700 uppercase mb-1">Replacing Broken On-Hired Unit ID <span class="text-rose-600">*</span></label>
+                <select id="modal-roster-replaced-unit" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white">
+                  <option value="">-- Select On-Hired Unit Being Replaced --</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block font-bold text-slate-700 uppercase mb-1">Technical Reason / WO Reference <span class="text-rose-600">*</span></label>
+              <textarea id="modal-roster-reason" rows="3"
+                placeholder="e.g., Major hydraulic pump failure (WO #4412) - scheduled for Off-Hire effective 1st of next month..."
+                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button type="button" onclick="PopulationModule.closeActionModal()"
+                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">
+                Cancel
+              </button>
+              <button type="button" id="btn-modal-roster-submit" onclick="PopulationModule.submitActionModal()"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition">
+                Confirm &amp; Record Audit Log
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- ===================================================== -->
       <!-- TAB 6: EXECUTIVE REPORT (SUPERADMIN & PLANNER ONLY)   -->
@@ -1319,6 +1455,26 @@
                 <tbody id="rep-tbody-unit"></tbody>
               </table>
             </div>
+
+            <!-- 3.4 Catatan Mutasi Status Armada (Transparansi Audit Manajemen) -->
+            <div id="rep-mutation-section" class="border border-slate-300 rounded-lg overflow-hidden">
+              <div class="px-3 py-1.5 bg-amber-50 border-b border-slate-300 flex items-center justify-between">
+                <span class="text-[11px] font-extrabold text-amber-900 uppercase">3.4 Catatan Mutasi Status Armada (On-Hired &harr; Off-Hired Audit Log)</span>
+                <span id="rep-mutation-badge" class="text-[10px] font-bold text-amber-800">0 Mutasi</span>
+              </div>
+              <table class="w-full text-left border-collapse text-[11px]">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-300 text-[10px] uppercase text-slate-600">
+                    <th class="px-2.5 py-1.5">Waktu</th>
+                    <th class="px-2.5 py-1.5">Unit ID</th>
+                    <th class="px-2.5 py-1.5">Jenis Mutasi</th>
+                    <th class="px-2.5 py-1.5">Oleh</th>
+                    <th class="px-2.5 py-1.5">Keterangan Teknis &amp; Unit Pengganti</th>
+                  </tr>
+                </thead>
+                <tbody id="tbody-rep-mutations"></tbody>
+              </table>
+            </div>
           </div>
 
           <!-- BAB IV: REKOMENDASI TINDAK LANJUT & LEMBAR PENGESAHAN -->
@@ -1395,6 +1551,6 @@
   </div>
 
   <!-- External Application Logic Bundle (with version tag to bypass stale browser cache) -->
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
