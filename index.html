@@ -3,415 +3,375 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Machine Performance System - PT. KTC Coal Mining &amp; Energy</title>
+  <title>Machine Performance System | PT. KTC Coal Mining &amp; Energy</title>
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Google Fonts: Inter -->
+  <!-- Google Font: Inter -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
-  <!-- Chart.js for Daily Trend & Component Pareto Charts -->
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif']
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js for KPI & Report Visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- SheetJS (XLSX) for Excel Parsing -->
+  <!-- SheetJS (XLSX) for Excel Parsing & Export -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
-  <!-- jsPDF & AutoTable for Direct A4 Landscape PDF Report Generation -->
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  <!-- jsPDF & AutoTable for A4 Landscape Executive Report -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
   <style>
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Inter', system-ui, sans-serif;
+    }
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
     }
   </style>
 </head>
-<body class="bg-slate-100 text-slate-800 antialiased">
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen">
 
   <!-- Toast Notification Container -->
-  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-  <!-- ========================================================= -->
-  <!-- 1. LOGIN SCREEN                                           -->
-  <!-- ========================================================= -->
-  <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8 border border-slate-200">
-      <div class="text-center mb-6">
-        <img src="logo-ktc.png" alt="PT. KTC Coal Mining &amp; Energy"
-          onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');"
-          class="h-16 w-auto mx-auto mb-3 object-contain" />
-        <div class="hidden inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white font-extrabold text-lg tracking-wider mb-3 shadow-lg shadow-blue-600/30">
-          MPS
+  <!-- ========================================================================
+       1. LOGIN SCREEN
+       ======================================================================== -->
+  <section id="login-screen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-4">
+    <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200/80 overflow-hidden">
+      <div class="p-6 sm:p-8">
+        <!-- Brand Header -->
+        <div class="flex flex-col items-center text-center mb-6">
+          <div class="w-16 h-16 rounded-2xl bg-slate-50 border border-slate-200 shadow-sm flex items-center justify-center p-2 mb-3">
+            <img src="logo-ktc.png" alt="KTC Logo" class="max-h-full max-w-full object-contain"
+              onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
+            <span class="hidden text-lg font-extrabold text-rose-600 tracking-tight">KTC</span>
+          </div>
+          <h1 class="text-xl font-extrabold text-slate-900 tracking-tight">MACHINE PERFORMANCE SYSTEM</h1>
+          <p class="text-xs font-bold text-blue-700 mt-0.5">PT. KTC COAL MINING &amp; ENERGY</p>
+          <p class="text-[11px] text-slate-500 mt-0.5">Heavy Equipment Availability &amp; Reliability Portal</p>
         </div>
-        <h1 class="text-xl font-extrabold text-slate-900 tracking-tight uppercase">Machine Performance System</h1>
-        <p class="text-xs font-semibold text-blue-700 mt-1">PT. KTC COAL MINING &amp; ENERGY</p>
-        <p class="text-[11px] text-slate-400 mt-0.5">Heavy Equipment Availability &amp; Reliability Portal</p>
+
+        <!-- Login Form -->
+        <form id="form-login" class="space-y-4">
+          <div>
+            <label for="login-username" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Username</label>
+            <input type="text" id="login-username" autocomplete="username" placeholder="Enter username" required
+              class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition" />
+          </div>
+
+          <div>
+            <label for="login-password" class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Password</label>
+            <div class="relative">
+              <input type="password" id="login-password" autocomplete="current-password" placeholder="Enter password" required
+                class="w-full px-3.5 py-2.5 pr-10 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 transition" />
+              <button type="button" onclick="togglePasswordVisibility()" aria-label="Toggle password visibility"
+                class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-slate-600">
+                <svg id="icon-eye-open" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <svg id="icon-eye-closed" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs">
+            <label class="inline-flex items-center gap-2 text-slate-600 cursor-pointer select-none">
+              <input type="checkbox" id="login-remember-user" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+              <span>Remember my username</span>
+            </label>
+            <button type="button" onclick="AuthModule.enterPreviewMode()"
+              class="text-blue-600 hover:text-blue-800 font-semibold underline">
+              Live UI Demo
+            </button>
+          </div>
+
+          <p id="login-error-msg" class="text-xs font-semibold text-rose-600 min-h-[16px]"></p>
+
+          <button type="submit" id="btn-login-submit"
+            class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md hover:shadow-lg transition">
+            Sign In
+          </button>
+        </form>
+
+        <!-- Architect & Copyright Footer -->
+        <div class="mt-6 pt-4 border-t border-slate-100 text-center space-y-1.5">
+          <p class="text-[11px] font-semibold text-slate-600">
+            System Architect &amp; Designed by: <span class="text-blue-700 font-bold">Adi Pranata</span>
+          </p>
+          <p class="text-[10px] leading-relaxed text-slate-400">
+            &copy; 2026 Adi Pranata. All Rights Reserved. This software architecture, source code, and analytical engine are protected under the Copyright Law of the Republic of Indonesia (Law No. 28 of 2014 on Copyright) and international copyright treaties. Unauthorized reproduction, modification, reverse engineering, or distribution without prior written consent from the author is strictly prohibited.
+          </p>
+        </div>
       </div>
+    </div>
+  </section>
 
-      <form id="form-login" class="space-y-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Username</label>
-          <input type="text" id="login-username" required autocomplete="username"
-            placeholder="Enter username"
-            class="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        </div>
+  <!-- ========================================================================
+       2. MAIN APPLICATION SHELL
+       ======================================================================== -->
+  <div id="app-shell" class="hidden min-h-screen flex flex-col">
 
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Password</label>
-          <div class="relative">
-            <input type="password" id="login-password" required autocomplete="current-password"
-              placeholder="Enter password"
-              class="w-full pl-3.5 pr-10 py-2.5 text-sm border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            <button type="button" onclick="togglePasswordVisibility()" title="Show / Hide Password"
-              class="absolute inset-y-0 right-0 px-3 flex items-center text-slate-400 hover:text-slate-600">
-              <svg id="icon-eye-open" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    <!-- Top Navigation Bar -->
+    <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-30">
+      <div class="max-w-[1440px] mx-auto px-4 sm:px-6">
+        <div class="flex flex-wrap items-center justify-between py-3 gap-3 border-b border-slate-800">
+          <!-- Brand -->
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-white p-1.5 flex items-center justify-center shrink-0">
+              <img src="logo-ktc.png" alt="KTC" class="max-h-full max-w-full object-contain"
+                onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');" />
+              <span class="hidden text-xs font-extrabold text-rose-600">KTC</span>
+            </div>
+            <div>
+              <h1 class="text-sm sm:text-base font-extrabold tracking-tight leading-tight">MACHINE PERFORMANCE SYSTEM</h1>
+              <p class="text-[11px] text-slate-400">PT. KTC Coal Mining &amp; Energy &bull; Fleet Availability &amp; Reliability</p>
+            </div>
+          </div>
+
+          <!-- Global Site Switcher, Refresh & User Profile -->
+          <div class="flex items-center gap-2.5 sm:gap-3">
+            <div class="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1.5 rounded-xl border border-slate-700">
+              <span class="text-[10px] font-bold uppercase text-slate-400">SITE:</span>
+              <select id="global-site-selector" onchange="AuthModule.switchSite(this.value)"
+                class="bg-transparent text-xs font-extrabold text-white focus:outline-none cursor-pointer">
+                <option value="TTLP" class="text-slate-900">TTLP</option>
+                <option value="TNPN" class="text-slate-900">TNPN</option>
+              </select>
+            </div>
+
+            <button type="button" onclick="refreshCurrentView()" title="Refresh Latest Data"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-semibold rounded-xl border border-slate-700 transition">
+              <svg id="icon-global-refresh" class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
-              <svg id="icon-eye-closed" class="w-4 h-4 hidden" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-              </svg>
+              <span class="hidden sm:inline">Refresh</span>
+            </button>
+
+            <div class="text-right hidden md:block">
+              <div id="user-display-name" class="text-xs font-bold text-white leading-tight">User</div>
+              <div id="user-role-badge" class="text-[10px] font-semibold text-blue-400">Role</div>
+            </div>
+
+            <button type="button" onclick="AuthModule.logout()"
+              class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition">
+              Logout
             </button>
           </div>
         </div>
 
-        <div class="flex items-center justify-between">
-          <label class="inline-flex items-center gap-2 cursor-pointer text-xs text-slate-600">
-            <input type="checkbox" id="login-remember-user" class="w-3.5 h-3.5 text-blue-600 rounded border-slate-300" />
-            <span>Remember my username</span>
-          </label>
-          <button type="button" onclick="AuthModule.enterPreviewMode()"
-            class="text-[11px] text-slate-400 hover:text-blue-600 underline transition">
-            Live UI Demo
-          </button>
-        </div>
-
-        <div id="login-error-msg" class="text-xs text-rose-600 font-semibold min-h-[1.25rem]"></div>
-
-        <button type="submit" id="btn-login-submit"
-          class="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm rounded-xl shadow-md transition">
-          Sign In
-        </button>
-      </form>
-
-      <!-- System Architect & Intellectual Property Notice -->
-      <div class="mt-6 pt-4 border-t border-slate-100 text-center space-y-1.5">
-        <p class="text-xs font-semibold text-slate-700">
-          System Architect &amp; Designed by:
-          <a href="https://www.linkedin.com/in/adi-pranata-86449658/" target="_blank" rel="noopener noreferrer"
-            class="text-blue-600 hover:text-blue-800 underline font-bold transition">
-            Adi Pranata
-          </a>
-        </p>
-        <p class="text-[10px] leading-relaxed text-slate-400">
-          &copy; 2026 Adi Pranata. All Rights Reserved. This software architecture, source code, and analytical engine are protected under the Copyright Law of the Republic of Indonesia (Law No. 28 of 2014 on Copyright) and international copyright treaties. Unauthorized reproduction, modification, reverse engineering, or distribution without prior written consent from the author is strictly prohibited.
-        </p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ========================================================= -->
-  <!-- 2. MAIN APPLICATION SHELL (AUTHENTICATED)                 -->
-  <!-- ========================================================= -->
-  <div id="app-shell" class="hidden min-h-screen flex flex-col">
-
-    <!-- Top Navbar (Uniform Wide Layout: max-w-[1600px]) -->
-    <header id="app-header" class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
-      <div class="max-w-[1600px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <img src="logo-ktc.png" alt="KTC Logo"
-            onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');"
-            class="h-9 w-auto object-contain bg-white rounded-lg px-1.5 py-1 shadow-sm" />
-          <span class="hidden px-2.5 py-1 bg-blue-600 rounded-lg font-extrabold text-xs tracking-wider">MPS</span>
-          <div>
-            <h1 class="text-sm font-extrabold tracking-tight leading-tight uppercase">Machine Performance System</h1>
-            <p class="text-[11px] text-slate-400">PT. KTC Coal Mining &amp; Energy &bull; Fleet Availability &amp; Reliability</p>
-          </div>
-        </div>
-
-        <!-- Global Site Selector & User Info -->
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-1.5 bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-700">
-            <label for="global-site-selector" class="text-[11px] text-slate-400 font-semibold">SITE:</label>
-            <select id="global-site-selector" onchange="AuthModule.switchSite(this.value)"
-              class="bg-transparent text-xs font-bold text-white focus:outline-none cursor-pointer">
-              <option value="TTLP" class="text-slate-900">TTLP</option>
-              <option value="TNPN" class="text-slate-900">TNPN</option>
-            </select>
-          </div>
-
-          <button type="button" id="btn-global-refresh" onclick="refreshCurrentView()" title="Reload Latest Data"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg transition">
-            <svg id="icon-global-refresh" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span class="hidden sm:inline">Refresh</span>
-          </button>
-
-          <div class="text-right hidden sm:block">
-            <div id="user-display-name" class="text-xs font-semibold text-white">-</div>
-            <div id="user-role-badge" class="text-[10px] text-blue-300">-</div>
-          </div>
-
-          <button type="button" onclick="AuthModule.logout()"
-            class="px-3 py-1.5 text-xs font-semibold bg-rose-600 hover:bg-rose-700 rounded-lg transition">
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <!-- Navigation Tabs -->
-      <nav class="bg-slate-800 border-t border-slate-700">
-        <div class="max-w-[1600px] mx-auto px-4 flex items-center overflow-x-auto gap-1">
-          <!-- Monitoring Group (All Roles) -->
+        <!-- Tab Navigation Menu -->
+        <nav class="flex items-center gap-1 sm:gap-2 overflow-x-auto pt-1">
           <button type="button" data-tab="tab-dashboard" onclick="switchAppTab('tab-dashboard')"
-            class="nav-tab-btn inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 border-blue-500 text-white whitespace-nowrap">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            KPI Dashboard
+            class="nav-tab-btn px-3.5 py-2.5 text-xs font-bold border-b-2 border-blue-500 text-white whitespace-nowrap transition flex items-center gap-1.5">
+            <span>&#128202;</span><span>KPI Dashboard</span>
           </button>
 
           <button type="button" data-tab="tab-history" onclick="switchAppTab('tab-history')"
-            class="nav-tab-btn inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            KPI History
+            class="nav-tab-btn px-3.5 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap transition flex items-center gap-1.5">
+            <span>&#128337;</span><span>KPI History</span>
           </button>
 
-          <!-- Divider for Operational Menus -->
-          <span class="admin-only-menu h-4 w-px bg-slate-600 mx-1.5 shrink-0"></span>
-
-          <!-- Operational Group (Admin, Planner & Superadmin) -->
           <button type="button" data-tab="tab-upload-bd" onclick="switchAppTab('tab-upload-bd')"
-            class="nav-tab-btn admin-only-menu inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap">
-            <span class="px-1.5 py-0.2 bg-slate-700 text-blue-300 rounded text-[10px]">1</span>
-            Upload Breakdown
+            class="nav-tab-btn admin-only-menu px-3.5 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap transition flex items-center gap-1.5">
+            <span class="px-1.5 py-0.2 bg-slate-700 rounded text-[10px]">1</span><span>Upload Breakdown</span>
           </button>
 
           <button type="button" data-tab="tab-input-hm" onclick="switchAppTab('tab-input-hm')"
-            class="nav-tab-btn admin-only-menu inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap">
-            <span class="px-1.5 py-0.2 bg-slate-700 text-blue-300 rounded text-[10px]">2</span>
-            Daily HM Input
+            class="nav-tab-btn admin-only-menu px-3.5 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap transition flex items-center gap-1.5">
+            <span class="px-1.5 py-0.2 bg-slate-700 rounded text-[10px]">2</span><span>Daily HM Input</span>
           </button>
 
-          <!-- Planner & Superadmin Group (Unit Population & Executive Report) -->
-          <span class="planner-only-menu hidden h-4 w-px bg-slate-600 mx-1.5 shrink-0"></span>
-
           <button type="button" data-tab="tab-population" onclick="switchAppTab('tab-population')"
-            class="nav-tab-btn planner-only-menu hidden inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            Unit Population
+            class="nav-tab-btn planner-only-menu px-3.5 py-2.5 text-xs font-bold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap transition flex items-center gap-1.5">
+            <span>&#128668;</span><span>Unit Population</span>
           </button>
 
           <button type="button" data-tab="tab-report" onclick="switchAppTab('tab-report')"
-            class="nav-tab-btn planner-only-menu hidden inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold border-b-2 border-transparent text-amber-300 hover:text-white whitespace-nowrap">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-            </svg>
-            Executive Report
+            class="nav-tab-btn planner-only-menu px-3.5 py-2.5 text-xs font-bold border-b-2 border-transparent text-amber-300 hover:text-white whitespace-nowrap transition flex items-center gap-1.5">
+            <span>&#128424;</span><span>Executive Report</span>
           </button>
-        </div>
-      </nav>
+        </nav>
+      </div>
     </header>
 
-    <!-- Main Content Container (Uniform Wide Layout: max-w-[1600px] across ALL tabs) -->
-    <main id="app-main-container" class="flex-1 max-w-[1600px] w-full mx-auto px-4 py-6">
+    <!-- Main Workspace Container -->
+    <main class="flex-1 max-w-[1440px] w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-      <!-- ===================================================== -->
-      <!-- TAB 1: KPI DASHBOARD                                  -->
-      <!-- ===================================================== -->
-      <section id="tab-dashboard" class="app-tab-panel space-y-5">
-
-        <!-- Filter Bar & Quick Period Presets -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+      <!-- ======================================================================
+           TAB 1: KPI DASHBOARD
+           ====================================================================== -->
+      <div id="tab-dashboard" class="app-tab-panel space-y-6">
+        <!-- Filter & Action Bar -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
           <div class="flex flex-wrap items-end justify-between gap-4">
             <div class="flex flex-wrap items-end gap-3">
               <div>
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">From Date</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">From Date</label>
                 <input type="date" id="dash-start-date" onchange="DashboardModule.clearPresetHighlight(); DashboardModule.load()"
-                  class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">To Date</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">To Date</label>
                 <input type="date" id="dash-end-date" onchange="DashboardModule.clearPresetHighlight(); DashboardModule.load()"
-                  class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500" />
               </div>
               <div>
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Model Filter</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Unit Model</label>
                 <select id="dash-filter-model" onchange="DashboardModule.load()"
-                  class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl bg-white focus:outline-none focus:border-blue-500">
                   <option value="ALL">All Unit Models</option>
                 </select>
               </div>
               <button type="button" onclick="DashboardModule.load()"
-                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition">
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition">
                 Apply Filter
               </button>
             </div>
 
+            <!-- Quick Date Presets & Export -->
             <div class="flex flex-wrap items-center gap-2">
-              <button type="button" id="btn-dash-export-csv" onclick="DashboardModule.exportToCsv()"
-                class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer">
-                <span>Export CSV</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t border-slate-100">
-            <div class="flex flex-wrap items-center gap-1.5">
-              <span class="text-[11px] font-semibold text-slate-400 mr-1">Quick Period:</span>
-              <button type="button" data-preset="MTD" onclick="DashboardModule.applyDatePreset('MTD')"
-                class="dash-preset-btn px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white border border-blue-600 rounded-lg transition cursor-pointer">
-                Month-to-Date (MTD)
-              </button>
-              <button type="button" data-preset="LAST_7" onclick="DashboardModule.applyDatePreset('LAST_7')"
-                class="dash-preset-btn px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition cursor-pointer">
-                Last 7 Days
-              </button>
               <button type="button" data-preset="YESTERDAY" onclick="DashboardModule.applyDatePreset('YESTERDAY')"
-                class="dash-preset-btn px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition cursor-pointer">
+                class="dash-preset-btn px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 transition">
                 Yesterday
               </button>
+              <button type="button" data-preset="LAST_7" onclick="DashboardModule.applyDatePreset('LAST_7')"
+                class="dash-preset-btn px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 transition">
+                Last 7 Days
+              </button>
+              <button type="button" data-preset="MTD" onclick="DashboardModule.applyDatePreset('MTD')"
+                class="dash-preset-btn px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-blue-600 text-white border-blue-600 transition">
+                MTD
+              </button>
               <button type="button" data-preset="LAST_MONTH" onclick="DashboardModule.applyDatePreset('LAST_MONTH')"
-                class="dash-preset-btn px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition cursor-pointer">
+                class="dash-preset-btn px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 transition">
                 Last Month
               </button>
+              <span class="h-5 w-px bg-slate-200 mx-1"></span>
+              <button type="button" id="btn-dash-export-csv" onclick="DashboardModule.exportToCsv()"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">
+                <span>Export CSV</span>
+              </button>
+              <button type="button" onclick="DashboardModule.exportToExcel()"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold rounded-xl transition">
+                <span>Export Excel</span>
+              </button>
             </div>
-            <span id="dash-status-msg" class="text-xs text-slate-500">Ready to load KPI metrics...</span>
           </div>
+          <p id="dash-status-msg" class="text-xs text-slate-500">Ready.</p>
         </div>
 
         <!-- 5 Primary KPI Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <div class="text-[11px] font-bold text-slate-400 uppercase">Physical Availability (PA)</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Physical Availability (PA)</div>
             <div id="kpi-val-pa" class="text-2xl font-extrabold text-slate-900 mt-1">0.00%</div>
             <span id="kpi-badge-pa" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">Target &ge; 85%</span>
           </div>
 
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <div class="text-[11px] font-bold text-slate-400 uppercase">Mechanical Availability (MA)</div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Mechanical Availability (MA)</div>
             <div id="kpi-val-ma" class="text-2xl font-extrabold text-slate-900 mt-1">0.00%</div>
             <span id="kpi-badge-ma" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">Target &ge; 85%</span>
           </div>
 
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <div class="text-[11px] font-bold text-slate-400 uppercase">Use of Availability (UA)</div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+            <div class="text-[11px] font-bold uppercase text-slate-400">Use of Availability (UA)</div>
             <div id="kpi-val-ua" class="text-2xl font-extrabold text-slate-900 mt-1">0.00%</div>
             <span id="kpi-badge-ua" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">Target &ge; 85%</span>
           </div>
 
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <div class="text-[11px] font-bold text-slate-400 uppercase">MTTR (Avg Repair)</div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+            <div class="text-[11px] font-bold uppercase text-slate-400">MTTR (Avg Repair Time)</div>
             <div id="kpi-val-mttr" class="text-2xl font-extrabold text-slate-900 mt-1">0.00 Hrs</div>
-            <span id="kpi-badge-mttr" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">Target &le; 4.0 Hrs</span>
+            <span id="kpi-badge-mttr" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">Target &le; 4.0h</span>
           </div>
 
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 col-span-2 md:col-span-1">
-            <div class="text-[11px] font-bold text-slate-400 uppercase">MTBR (Avg Between BD)</div>
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+            <div class="text-[11px] font-bold uppercase text-slate-400">MTBR (Avg Between BD)</div>
             <div id="kpi-val-mtbr" class="text-2xl font-extrabold text-slate-900 mt-1">0.00 Hrs</div>
-            <span id="kpi-badge-mtbr" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">Target &ge; 40.0 Hrs</span>
+            <span id="kpi-badge-mtbr" class="inline-block mt-1 px-2 py-0.5 text-xs font-semibold rounded bg-slate-100 text-slate-600">Target &ge; 40.0h</span>
           </div>
         </div>
 
-        <!-- Time Distribution Bar (Hours + Percentages) -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
+        <!-- Calendar Time Distribution Bar -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 class="text-sm font-bold text-slate-800">Total Calendar Hours Distribution</h3>
-              <p class="text-xs text-slate-500">Proportion of productive Working Hours (WH) versus breakdown, weather, and standby losses</p>
-            </div>
-            <span id="kpi-total-cal-badge" class="px-3 py-1 bg-slate-900 text-white text-xs font-bold rounded-lg">
-              Total Calendar: 0.0 Hrs (100%)
-            </span>
+            <h2 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Fleet Calendar Time Allocation</h2>
+            <span id="kpi-total-cal-badge" class="text-xs font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg">Total Calendar: 0.0 Hrs (100%)</span>
           </div>
-
-          <div id="kpi-time-bar" class="w-full h-7 bg-slate-100 rounded-lg overflow-hidden flex text-[11px] font-bold text-white shadow-inner"></div>
-
-          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1 text-xs">
-            <div class="flex items-center gap-2 p-2 rounded-lg bg-emerald-50/70 border border-emerald-100">
-              <span class="w-3 h-3 rounded-sm bg-emerald-500 shrink-0"></span>
-              <div>
-                <div class="text-[11px] text-slate-500 font-medium">Working (WH)</div>
-                <div id="leg-wh" class="font-bold text-slate-800">0.0h (0.0%)</div>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 p-2 rounded-lg bg-rose-50/70 border border-rose-100">
-              <span class="w-3 h-3 rounded-sm bg-rose-500 shrink-0"></span>
-              <div>
-                <div class="text-[11px] text-slate-500 font-medium">BD Unscheduled</div>
-                <div id="leg-bd-unsch" class="font-bold text-rose-700">0.0h (0.0%)</div>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 p-2 rounded-lg bg-amber-50/70 border border-amber-100">
-              <span class="w-3 h-3 rounded-sm bg-amber-400 shrink-0"></span>
-              <div>
-                <div class="text-[11px] text-slate-500 font-medium">BD Scheduled</div>
-                <div id="leg-bd-sch" class="font-bold text-amber-800">0.0h (0.0%)</div>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 p-2 rounded-lg bg-sky-50/70 border border-sky-100">
-              <span class="w-3 h-3 rounded-sm bg-sky-500 shrink-0"></span>
-              <div>
-                <div class="text-[11px] text-slate-500 font-medium">Rain / Slippery</div>
-                <div id="leg-rain" class="font-bold text-sky-800">0.0h (0.0%)</div>
-              </div>
-            </div>
-
-            <div class="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200 col-span-2 sm:col-span-1">
-              <span class="w-3 h-3 rounded-sm bg-slate-400 shrink-0"></span>
-              <div>
-                <div class="text-[11px] text-slate-500 font-medium">Standby</div>
-                <div id="leg-stby" class="font-bold text-slate-700">0.0h (0.0%)</div>
-              </div>
-            </div>
+          <div id="kpi-time-bar" class="w-full h-7 rounded-xl overflow-hidden flex text-[11px] font-bold text-white bg-slate-100"></div>
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs pt-1">
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-emerald-500 shrink-0"></span><span class="text-slate-600">WH:</span><strong id="leg-wh">0.0h</strong></div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-rose-500 shrink-0"></span><span class="text-slate-600">BD Unsch:</span><strong id="leg-bd-unsch">0.0h</strong></div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-amber-400 shrink-0"></span><span class="text-slate-600">BD Sch:</span><strong id="leg-bd-sch">0.0h</strong></div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-sky-500 shrink-0"></span><span class="text-slate-600">Rain:</span><strong id="leg-rain">0.0h</strong></div>
+            <div class="flex items-center gap-2"><span class="w-3 h-3 rounded bg-slate-400 shrink-0"></span><span class="text-slate-600">Standby:</span><strong id="leg-stby">0.0h</strong></div>
           </div>
         </div>
 
-        <!-- Daily Trend & Component Pareto Charts -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div class="lg:col-span-2 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <h3 class="text-sm font-bold text-slate-800 mb-3">Daily Trend: PA, MA &amp; UA (%)</h3>
+        <!-- Charts Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-700 mb-3">Daily Availability Trend (PA, MA, UA vs Target 85%)</h3>
             <div class="h-64">
               <canvas id="chart-kpi-trend"></canvas>
             </div>
           </div>
-
-          <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-            <h3 class="text-sm font-bold text-slate-800 mb-3">Top 10 Component Breakdown Pareto (Hours)</h3>
+          <div class="lg:col-span-5 bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-700 mb-3">Top Unscheduled Breakdown Components (Hrs)</h3>
             <div class="h-64">
               <canvas id="chart-component-pareto"></canvas>
             </div>
           </div>
         </div>
 
-        <!-- Active Breakdown Units Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-rose-200 overflow-hidden">
-          <div class="px-4 py-3 bg-rose-50 border-b border-rose-200 flex items-center justify-between">
-            <h3 class="text-sm font-bold text-rose-900">Active Breakdown Units (Not RFU)</h3>
+        <!-- Active Open Breakdowns -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-5 py-3.5 bg-rose-50/70 border-b border-rose-100 flex items-center justify-between">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-rose-800">Active Open Breakdowns (Not Yet RFU)</h3>
             <span id="badge-active-bd-count" class="px-2.5 py-0.5 text-xs font-bold bg-rose-600 text-white rounded-full">0 Units Down</span>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase text-slate-500">
-                  <th class="px-3 py-2">Unit ID</th>
-                  <th class="px-3 py-2">Model</th>
-                  <th class="px-3 py-2">BD Start Time</th>
-                  <th class="px-3 py-2">Down Duration</th>
-                  <th class="px-3 py-2">Code</th>
-                  <th class="px-3 py-2">Location</th>
-                  <th class="px-3 py-2">Problem Description</th>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
+                  <th class="px-3 py-2.5">Unit ID</th>
+                  <th class="px-3 py-2.5">Model</th>
+                  <th class="px-3 py-2.5">Time In</th>
+                  <th class="px-3 py-2.5">Down Duration</th>
+                  <th class="px-3 py-2.5">Code</th>
+                  <th class="px-3 py-2.5">Location</th>
+                  <th class="px-3 py-2.5">Problem Description</th>
                 </tr>
               </thead>
               <tbody id="tbody-active-bd"></tbody>
@@ -419,17 +379,17 @@
           </div>
         </div>
 
-        <!-- KPI Summary by Model Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200">
-            <h3 class="text-sm font-bold text-slate-800">KPI Summary by Unit Model</h3>
+        <!-- KPI By Model -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-slate-200">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Performance Summary by Equipment Model</h3>
           </div>
           <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
               <thead>
-                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] uppercase text-slate-500">
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
                   <th class="px-3 py-2.5">Model</th>
-                  <th class="px-3 py-2.5 text-right">WH (Hrs)</th>
+                  <th class="px-3 py-2.5 text-right">WH</th>
                   <th class="px-3 py-2.5 text-right">BD Unsch</th>
                   <th class="px-3 py-2.5 text-right">BD Sch</th>
                   <th class="px-3 py-2.5 text-right">Standby</th>
@@ -445,263 +405,236 @@
           </div>
         </div>
 
-        <!-- Detailed KPI by Unit Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 class="text-sm font-bold text-slate-800">Detailed KPI by Unit</h3>
-              <p class="text-[11px] text-slate-400">Click column headers (PA, MA, UA, WH, BD Unsch) to sort</p>
-            </div>
+        <!-- KPI By Unit -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Individual Unit Performance Breakdown</h3>
             <div class="flex flex-wrap items-center gap-2">
               <select id="dash-unit-target-filter" onchange="DashboardModule.renderUnitTable()"
-                class="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
-                <option value="ALL">All Units</option>
-                <option value="BELOW">Needs Attention (PA &lt; 85%)</option>
-                <option value="PASS">Target Achieved (PA &ge; 85%)</option>
+                class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
+                <option value="ALL">All Statuses</option>
+                <option value="BELOW">Below Target (PA &lt; 85%)</option>
+                <option value="PASS">Passed Target (PA &ge; 85%)</option>
               </select>
-              <input type="text" id="dash-unit-search" oninput="DashboardModule.renderUnitTable()"
-                placeholder="Search Unit ID / Model..."
-                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+              <input type="text" id="dash-unit-search" oninput="DashboardModule.renderUnitTable()" placeholder="Search Unit ID / Model..."
+                class="px-3 py-1.5 text-xs border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500" />
             </div>
           </div>
-          <div class="overflow-x-auto max-h-96">
+          <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
-              <thead class="sticky top-0 bg-slate-50 shadow-sm">
-                <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500 select-none">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500 select-none">
                   <th onclick="DashboardModule.sortUnitBy('unitId')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Unit ID &#8597;</th>
                   <th onclick="DashboardModule.sortUnitBy('model')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Model &#8597;</th>
                   <th onclick="DashboardModule.sortUnitBy('wh')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">WH &#8597;</th>
                   <th onclick="DashboardModule.sortUnitBy('bdUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Unsch &#8597;</th>
-                  <th class="px-3 py-2.5 text-right">BD Sch</th>
-                  <th class="px-3 py-2.5 text-right">Standby</th>
+                  <th onclick="DashboardModule.sortUnitBy('bdSched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Sch &#8597;</th>
+                  <th onclick="DashboardModule.sortUnitBy('stbyHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Standby &#8597;</th>
                   <th onclick="DashboardModule.sortUnitBy('pa')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">PA (%) &#8597;</th>
                   <th onclick="DashboardModule.sortUnitBy('ma')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MA (%) &#8597;</th>
                   <th onclick="DashboardModule.sortUnitBy('ua')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">UA (%) &#8597;</th>
-                  <th class="px-3 py-2.5 text-right">MTTR</th>
-                  <th class="px-3 py-2.5 text-right">MTBR</th>
+                  <th onclick="DashboardModule.sortUnitBy('mttr')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MTTR &#8597;</th>
+                  <th onclick="DashboardModule.sortUnitBy('mtbr')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MTBR &#8597;</th>
                 </tr>
               </thead>
               <tbody id="tbody-kpi-unit"></tbody>
             </table>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- ===================================================== -->
-      <!-- TAB 2: KPI HISTORY                                    -->
-      <!-- ===================================================== -->
-      <section id="tab-history" class="app-tab-panel hidden space-y-5">
-
-        <!-- History Filter Bar -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-end justify-between gap-4">
-          <div class="flex flex-wrap items-end gap-3">
-            <div>
-              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Month Period</label>
-              <input type="month" id="hist-month-picker" onchange="HistoryModule.load()"
-                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+      <!-- ======================================================================
+           TAB 2: KPI HISTORY
+           ====================================================================== -->
+      <div id="tab-history" class="app-tab-panel hidden space-y-5">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <div class="flex flex-wrap items-end gap-3">
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Month Period</label>
+                <input type="month" id="hist-month-picker" onchange="HistoryModule.load()"
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl" />
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Granularity</label>
+                <select id="hist-view-mode" onchange="HistoryModule.render()"
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
+                  <option value="DAILY">Daily Fleet Summary</option>
+                  <option value="UNIT">Unit-Level Daily Log</option>
+                </select>
+              </div>
+              <div id="hist-model-filter-wrap" class="hidden">
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Model</label>
+                <select id="hist-filter-model" onchange="HistoryModule.render()"
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
+                  <option value="ALL">All Unit Models</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Target Status</label>
+                <select id="hist-filter-status" onchange="HistoryModule.render()"
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
+                  <option value="ALL">All Records</option>
+                  <option value="PASS">PA &ge; 85%</option>
+                  <option value="BELOW">PA &lt; 85%</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Search</label>
+                <input type="text" id="hist-search-input" oninput="HistoryModule.render()" placeholder="Date, Unit ID..."
+                  class="px-3 py-2 text-xs border border-slate-300 rounded-xl" />
+              </div>
             </div>
 
-            <div>
-              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">View Mode</label>
-              <select id="hist-view-mode" onchange="HistoryModule.render()"
-                class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
-                <option value="DAILY">Daily Fleet Summary</option>
-                <option value="UNIT">Daily Unit Breakdown</option>
-              </select>
-            </div>
-
-            <div id="hist-model-filter-wrap" class="hidden">
-              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Model Filter</label>
-              <select id="hist-filter-model" onchange="HistoryModule.render()"
-                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
-                <option value="ALL">All Unit Models</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">PA Target Status</label>
-              <select id="hist-filter-status" onchange="HistoryModule.render()"
-                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
-                <option value="ALL">All Records</option>
-                <option value="PASS">PA &ge; 85% (Passed)</option>
-                <option value="BELOW">PA &lt; 85% (Below Target)</option>
-              </select>
-            </div>
-
-            <div>
-              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Quick Search</label>
-              <input type="text" id="hist-search-input" oninput="HistoryModule.render()"
-                placeholder="Search date / unit..."
-                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+            <div class="flex items-center gap-2">
+              <span id="hist-row-count" class="px-2.5 py-1 text-xs font-bold bg-slate-100 text-slate-700 rounded-lg">0 Rows</span>
+              <button type="button" id="btn-hist-export-csv" onclick="HistoryModule.exportCsv()"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">
+                <span>Export CSV</span>
+              </button>
             </div>
           </div>
-
-          <button type="button" id="btn-hist-export-csv" onclick="HistoryModule.exportCsv()"
-            class="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer">
-            <span>Export CSV</span>
-          </button>
+          <p id="hist-status-msg" class="text-xs text-slate-500">Select a month to view KPI history.</p>
         </div>
 
-        <!-- History Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-            <span id="hist-status-msg" class="text-xs text-slate-500">Select a month to view KPI history...</span>
-            <span id="hist-row-count" class="px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded-full">0 Rows</span>
-          </div>
-          <div class="overflow-x-auto max-h-[36rem]">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
-              <thead id="thead-kpi-history" class="sticky top-0 bg-slate-50 shadow-sm z-10"></thead>
+              <thead id="thead-kpi-history" class="bg-slate-50"></thead>
               <tbody id="tbody-kpi-history"></tbody>
               <tfoot id="tfoot-kpi-history" class="bg-slate-900 text-white text-xs font-bold"></tfoot>
             </table>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- ===================================================== -->
-      <!-- TAB 3: UPLOAD BREAKDOWN REPORT                        -->
-      <!-- ===================================================== -->
-      <section id="tab-upload-bd" class="app-tab-panel hidden space-y-5">
-
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
+      <!-- ======================================================================
+           TAB 3: UPLOAD BREAKDOWN REPORT (.XLSX / .XLS)
+           ====================================================================== -->
+      <div id="tab-upload-bd" class="app-tab-panel hidden space-y-5">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-5">
+          <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 class="text-base font-bold text-slate-800">Upload Daily Machine Report (.xlsx / .xls)</h2>
-              <p class="text-xs text-slate-500 mt-0.5">
-                Automatically filters active fleet units for the selected site, splits cross-day breakdowns by shift, and deducts meal break intervals.
-              </p>
+              <h2 class="text-base font-extrabold text-slate-900">Upload Daily Machine Report (.xlsx / .xls)</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Automatically filters active On-Hired units (W/SW) for the selected site, splits cross-day breakdowns by shift, and deducts meal break intervals.</p>
             </div>
-            <div class="flex items-center gap-2">
-              <button type="button" onclick="UploadExcelModule.resetForm()"
-                class="px-3.5 py-1.5 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg transition">
-                Reset Form
-              </button>
-            </div>
+            <button type="button" onclick="UploadExcelModule.resetForm()"
+              class="px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl border border-slate-200 transition">
+              Reset Form
+            </button>
           </div>
 
-          <!-- Modern Drag & Drop Excel Upload Zone -->
+          <!-- Drag & Drop Zone -->
           <div id="excel-drop-zone"
             onclick="document.getElementById('excel-file-input').click()"
             ondragover="UploadExcelModule.handleDragOver(event)"
             ondragleave="UploadExcelModule.handleDragLeave(event)"
             ondrop="UploadExcelModule.handleDrop(event)"
-            class="border-2 border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/70 hover:bg-blue-50/40 rounded-xl p-5 text-center cursor-pointer transition">
-            <input type="file" id="excel-file-input" accept=".xlsx,.xls" class="hidden"
-              onchange="UploadExcelModule.handleFileSelect(event)" />
-            <div class="flex flex-col items-center justify-center gap-1.5">
-              <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-              </div>
-              <div id="excel-drop-title" class="text-xs font-bold text-slate-800">
-                Click to browse or drag &amp; drop Daily Report Machine (.xlsx / .xls) here
-              </div>
-              <div id="excel-file-meta" class="text-[11px] text-slate-500">
-                Supports multi-sheet Excel workbooks &bull; Automatically detects "Daily Report Machine" tab
-              </div>
+            class="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-2xl p-8 text-center cursor-pointer transition bg-slate-50/60">
+            <input type="file" id="excel-file-input" accept=".xlsx,.xls" class="hidden" onchange="UploadExcelModule.handleFileSelect(event)" />
+            <div class="w-11 h-11 mx-auto rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center mb-3">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
             </div>
+            <p id="excel-drop-title" class="text-sm font-bold text-slate-800">Click to browse or drag &amp; drop Daily Report Machine (.xlsx / .xls) here</p>
+            <p id="excel-file-meta" class="text-xs text-slate-500 mt-1">Supports multi-sheet Excel workbooks &bull; Automatically detects "Daily Report Machine" tab</p>
           </div>
 
-          <!-- Worksheet Selector & Date Range Filters -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <!-- Worksheet & Date Range Filter -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Excel Worksheet Tab</label>
+              <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Excel Worksheet Tab</label>
               <select id="excel-sheet-select" disabled onchange="UploadExcelModule.onSheetChange(this.value)"
-                class="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-lg bg-white disabled:bg-slate-100 disabled:text-slate-400 focus:outline-none focus:border-blue-500">
+                class="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl bg-white disabled:bg-slate-100">
                 <option value="">-- Load Excel File First --</option>
               </select>
             </div>
-
             <div>
-              <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Filter From Date (Optional)</label>
+              <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Filter From Date (Optional)</label>
               <input type="date" id="excel-filter-from" onchange="UploadExcelModule.reprocessCachedSheet()"
-                class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                class="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl" />
             </div>
-
             <div>
-              <label class="block text-xs font-semibold text-slate-600 uppercase mb-1">Filter To Date (Optional)</label>
+              <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Filter To Date (Optional)</label>
               <input type="date" id="excel-filter-to" onchange="UploadExcelModule.reprocessCachedSheet()"
-                class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                class="w-full px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl" />
             </div>
           </div>
 
-          <!-- Diagnostic Info Box -->
+          <!-- Diagnostics Banner -->
           <div id="excel-diagnostic-box" class="hidden p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
-            <div class="font-bold flex items-center gap-1.5">
-              <span>&#9888;</span>
-              <span id="excel-diag-title">Workbook Parsing Diagnostics</span>
-            </div>
-            <p id="excel-diag-body" class="text-[11px] leading-relaxed text-amber-800"></p>
+            <div id="excel-diag-title" class="font-bold"></div>
+            <div id="excel-diag-body"></div>
           </div>
 
-          <!-- Parsing Summary Cards -->
-          <div id="excel-summary-cards" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
-            <div class="p-3 rounded-lg bg-blue-50 border border-blue-200">
-              <div class="text-[11px] font-semibold text-blue-700 uppercase">Daily Segments</div>
-              <div id="excel-sum-rows" class="text-lg font-extrabold text-blue-900">0 Rows</div>
+          <!-- Parsed Summary Cards -->
+          <div id="excel-summary-cards" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
+              <div class="text-[10px] font-bold uppercase text-blue-600">Daily Segments</div>
+              <div id="excel-sum-rows" class="text-lg font-extrabold text-slate-900 mt-0.5">0 Rows</div>
             </div>
-            <div class="p-3 rounded-lg bg-rose-50 border border-rose-200">
-              <div class="text-[11px] font-semibold text-rose-700 uppercase">Unscheduled BD (USCH/ACD)</div>
-              <div id="excel-sum-unsch" class="text-lg font-extrabold text-rose-900">0.00 Hrs</div>
+            <div class="p-3.5 rounded-xl bg-rose-50 border border-rose-200">
+              <div class="text-[10px] font-bold uppercase text-rose-600">Unscheduled BD (USCH/ACD)</div>
+              <div id="excel-sum-unsch" class="text-lg font-extrabold text-rose-800 mt-0.5">0.00 Hrs</div>
             </div>
-            <div class="p-3 rounded-lg bg-amber-50 border border-amber-200">
-              <div class="text-[11px] font-semibold text-amber-800 uppercase">Scheduled BD (SCH/SVC)</div>
-              <div id="excel-sum-sch" class="text-lg font-extrabold text-amber-900">0.00 Hrs</div>
+            <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+              <div class="text-[10px] font-bold uppercase text-amber-700">Scheduled BD (SCH/SVC)</div>
+              <div id="excel-sum-sch" class="text-lg font-extrabold text-amber-900 mt-0.5">0.00 Hrs</div>
             </div>
-            <div class="p-3 rounded-lg bg-slate-50 border border-slate-200">
-              <div class="text-[11px] font-semibold text-slate-600 uppercase">Affected Active Units</div>
-              <div id="excel-sum-units" class="text-lg font-extrabold text-slate-900">0 Units</div>
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div class="text-[10px] font-bold uppercase text-slate-500">Affected Active Units</div>
+              <div id="excel-sum-units" class="text-lg font-extrabold text-slate-900 mt-0.5">0 Units</div>
             </div>
           </div>
 
-          <!-- Upload Progress Bar -->
-          <div id="excel-progress-wrap" class="hidden space-y-1.5 pt-1">
-            <div class="flex items-center justify-between text-xs font-semibold text-blue-700">
-              <span id="excel-progress-label">Uploading segments to Central Fleet Database...</span>
+          <!-- Upload Progress -->
+          <div id="excel-progress-wrap" class="hidden space-y-1.5">
+            <div class="flex justify-between text-xs font-bold text-blue-700">
+              <span id="excel-progress-label">Uploading...</span>
               <span id="excel-progress-pct">0%</span>
             </div>
             <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-              <div id="excel-progress-bar" style="width: 0%" class="h-full bg-blue-600 transition-all duration-300"></div>
+              <div id="excel-progress-bar" class="h-full bg-blue-600 transition-all duration-200" style="width: 0%"></div>
             </div>
           </div>
 
-          <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
-            <span id="upload-status-msg" class="text-sm text-slate-500">Select or drop a Daily Machine Report file to begin.</span>
+          <!-- Action Footer -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <p id="upload-status-msg" class="text-sm text-slate-500">Select or drop a Daily Machine Report file to begin.</p>
             <button type="button" id="btn-submit-excel" disabled onclick="UploadExcelModule.submitToServer()"
-              class="px-5 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow transition">
+              class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl shadow-sm transition">
               Upload to Database
             </button>
           </div>
         </div>
 
-        <!-- Parsed Daily Segments Preview Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <!-- Preview Table -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-5 py-3.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <h3 id="excel-preview-heading" class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Daily Breakdown Segments Preview (Latest 50 Rows)</h3>
             <div class="flex items-center gap-2">
-              <h3 id="excel-preview-heading" class="text-sm font-bold text-slate-800">Daily Breakdown Segments Preview (Latest 50 Rows)</h3>
+              <input type="text" id="excel-preview-search" oninput="UploadExcelModule.renderPreviewTable()" placeholder="Filter preview..."
+                class="px-3 py-1.5 text-xs border border-slate-300 rounded-xl" />
               <button type="button" id="btn-excel-toggle-rows" onclick="UploadExcelModule.toggleShowAllRows()"
-                class="hidden px-2.5 py-1 text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition">
-                Show All Rows
+                class="hidden px-3 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl">
+                Show All
               </button>
             </div>
-            <input type="text" id="excel-preview-search" oninput="UploadExcelModule.renderPreviewTable()"
-              placeholder="Search Unit ID / Component / Problem..."
-              class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
           </div>
-          <div class="overflow-x-auto max-h-96">
+          <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
-              <thead class="sticky top-0 bg-slate-50 shadow-sm">
-                <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
-                  <th class="px-3 py-2">Date</th>
-                  <th class="px-3 py-2">Unit ID</th>
-                  <th class="px-3 py-2">Code</th>
-                  <th class="px-3 py-2">Status</th>
-                  <th class="px-3 py-2">Time IN</th>
-                  <th class="px-3 py-2">Time OUT</th>
-                  <th class="px-3 py-2 text-right">Pure BD</th>
-                  <th class="px-3 py-2">Component</th>
-                  <th class="px-3 py-2">Problem</th>
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
+                  <th class="px-3 py-2.5">Date</th>
+                  <th class="px-3 py-2.5">Unit ID</th>
+                  <th class="px-3 py-2.5">Code</th>
+                  <th class="px-3 py-2.5">Status</th>
+                  <th class="px-3 py-2.5">Time In</th>
+                  <th class="px-3 py-2.5">Finish / Out</th>
+                  <th class="px-3 py-2.5 text-right">Pure BD</th>
+                  <th class="px-3 py-2.5">Comp</th>
+                  <th class="px-3 py-2.5">Problem Description</th>
                 </tr>
               </thead>
               <tbody id="tbody-excel-preview">
@@ -714,125 +647,95 @@
             </table>
           </div>
         </div>
-      </section>
+      </div>
 
-      <!-- ===================================================== -->
-      <!-- TAB 4: DAILY HM INPUT (DESKTOP KEYBOARD-FIRST GRID)   -->
-      <!-- ===================================================== -->
-      <section id="tab-input-hm" class="app-tab-panel hidden space-y-4 pb-24">
-
-        <!-- Unit ID Datalist for Keyboard Autocomplete -->
-        <datalist id="datalist-active-units"></datalist>
-
-        <!-- Operational Date Control, Monthly Strip & Keyboard Shortcuts -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-3">
+      <!-- ======================================================================
+           TAB 4: DAILY HM INPUT (DESKTOP KEYBOARD-FIRST GRID)
+           ====================================================================== -->
+      <div id="tab-input-hm" class="app-tab-panel hidden space-y-5">
+        <!-- Top Date & Monthly Strip Control -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <div class="flex flex-wrap items-end gap-2.5">
               <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Operational Date</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Operational Date</label>
                 <div class="flex items-center gap-1.5">
-                  <button type="button" onclick="InputHmModule.shiftDateBy(-1)" title="Previous Date"
-                    class="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition">
-                    &larr;
-                  </button>
+                  <button type="button" onclick="InputHmModule.shiftDateBy(-1)" class="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold">&larr;</button>
                   <input type="date" id="op-date-picker" onchange="InputHmModule.loadDate()"
-                    class="px-3 py-1.5 text-sm font-bold border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  <button type="button" onclick="InputHmModule.shiftDateBy(1)" title="Next Date"
-                    class="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 transition">
-                    &rarr;
-                  </button>
+                    class="px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl" />
+                  <button type="button" onclick="InputHmModule.shiftDateBy(1)" class="px-2.5 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold">&rarr;</button>
                 </div>
               </div>
 
-              <div class="mt-4 sm:mt-0 flex flex-wrap items-center gap-2">
-                <span id="op-friday-badge" class="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold">
-                  Standard Schedule: Day 10h + Night 10h = 20h
-                </span>
-                <button type="button" onclick="InputHmModule.quickFillBothShifts()"
-                  class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm transition">
-                  &#9889; Auto-Fill Active Units Day &amp; Night (Alt+W)
-                </button>
-                <button type="button" id="btn-hm-export-csv" onclick="InputHmModule.exportCsv()"
-                  class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer">
-                  <span>Export CSV</span>
-                </button>
-              </div>
+              <span id="op-friday-badge" class="px-3 py-2 text-xs font-bold rounded-xl bg-blue-50 text-blue-700 border border-blue-200">
+                Standard Schedule: Day 10h + Night 10h = 20h
+              </span>
+
+              <button type="button" onclick="InputHmModule.quickFillBothShifts()"
+                class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition">
+                &#9889; Auto-Fill Active Units Day &amp; Night (Alt+W)
+              </button>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3 text-[11px]">
-              <span class="inline-flex items-center gap-1.5 text-slate-600">
-                <span class="w-2.5 h-2.5 rounded bg-emerald-500 inline-block"></span> Complete (BD + HM)
-              </span>
-              <span class="inline-flex items-center gap-1.5 text-slate-600">
-                <span class="w-2.5 h-2.5 rounded bg-amber-400 inline-block"></span> BD Uploaded Only
-              </span>
-              <span class="inline-flex items-center gap-1.5 text-slate-600">
-                <span class="w-2.5 h-2.5 rounded bg-slate-200 inline-block"></span> Empty
-              </span>
-            </div>
+            <button type="button" id="btn-hm-export-csv" onclick="InputHmModule.exportCsv()"
+              class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">
+              <span>Export CSV</span>
+            </button>
           </div>
 
-          <!-- Monthly Completeness Calendar Strip -->
-          <div class="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-            <div class="flex flex-wrap items-center gap-1" id="op-monthly-calendar-strip"></div>
-          </div>
+          <!-- Monthly Calendar Strip -->
+          <div id="op-monthly-calendar-strip" class="flex flex-wrap gap-1.5 pt-1"></div>
 
-          <!-- Desktop Keyboard Shortcuts Cheat-Sheet -->
-          <div class="pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-slate-600 bg-slate-50 px-3 py-2 rounded-lg">
-            <span class="font-bold text-slate-800 uppercase text-[10px]">Keyboard Shortcuts:</span>
-            <span><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] font-bold">Enter</kbd> / <kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] font-bold">&uarr;&darr;</kbd> Navigate Rows</span>
-            <span><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] font-bold">=</kbd> in End HM = Auto Full Shift (10h/9h)</span>
-            <span><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] font-bold">Ctrl+V</kbd> Paste from Excel</span>
-            <span><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] font-bold">Alt+D</kbd> / <kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] font-bold">Alt+N</kbd> Focus Shift</span>
-            <span><kbd class="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px] font-bold">Ctrl+S</kbd> Save</span>
+          <!-- Keyboard Shortcuts Legend -->
+          <div class="flex flex-wrap items-center gap-3 text-[11px] text-slate-500 bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/80">
+            <span class="font-bold text-slate-700 uppercase">Keyboard Shortcuts:</span>
+            <span><kbd class="px-1.5 py-0.5 bg-white border rounded font-mono text-[10px]">Enter</kbd> / <kbd class="px-1.5 py-0.5 bg-white border rounded font-mono text-[10px]">&uarr;&darr;</kbd> Navigate Rows</span>
+            <span><kbd class="px-1.5 py-0.5 bg-white border rounded font-mono text-[10px]">=</kbd> in End HM = Auto Full Shift (10h/9h)</span>
+            <span><kbd class="px-1.5 py-0.5 bg-white border rounded font-mono text-[10px]">Ctrl+V</kbd> Paste from Excel</span>
+            <span><kbd class="px-1.5 py-0.5 bg-white border rounded font-mono text-[10px]">Alt+D</kbd> / <kbd class="px-1.5 py-0.5 bg-white border rounded font-mono text-[10px]">Alt+N</kbd> Focus Shift</span>
+            <span><kbd class="px-1.5 py-0.5 bg-white border rounded font-mono text-[10px]">Ctrl+S</kbd> Save</span>
           </div>
         </div>
 
-        <!-- Side-by-Side 2-Column Shift Grid: Day Shift (Left) & Night Shift (Right) -->
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <datalist id="datalist-active-units"></datalist>
 
-          <!-- Day Shift Panel -->
-          <div id="panel-day-shift" class="bg-white rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-amber-500 overflow-hidden transition">
-            <div class="px-3.5 py-2.5 bg-amber-50/90 border-b border-amber-200 flex flex-wrap items-center justify-between gap-2">
+        <!-- Dual Shift Panels -->
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+          <!-- DAY SHIFT -->
+          <div id="panel-day-shift" class="bg-white rounded-2xl shadow-sm border-t-4 border-t-amber-400 border border-slate-200 overflow-hidden">
+            <div class="px-4 py-3 bg-amber-50/60 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
               <div class="flex items-center gap-2">
-                <label class="inline-flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" id="chk-day-working" checked
-                    onchange="InputHmModule.toggleShiftWorking('DAY', this.checked)"
-                    class="w-4 h-4 text-blue-600 rounded" />
-                  <span class="text-xs font-extrabold text-slate-900 uppercase">DAY SHIFT (06:00 - 17:00)</span>
-                </label>
-                <span id="max-hrs-day" class="px-2 py-0.5 text-[11px] font-bold bg-amber-200 text-amber-900 rounded">Quota: 10h</span>
+                <input type="checkbox" id="chk-day-working" checked onchange="InputHmModule.toggleShiftWorking('DAY', this.checked)"
+                  class="w-4 h-4 rounded text-blue-600" />
+                <span class="text-xs font-extrabold text-slate-900">DAY SHIFT (06:00 - 17:00)</span>
+                <span id="max-hrs-day" class="px-2 py-0.5 text-[10px] font-bold bg-amber-200/80 text-amber-900 rounded">Quota: 10h</span>
               </div>
-
-              <div class="flex flex-wrap items-center gap-1.5">
-                <div class="flex items-center gap-1 mr-1">
-                  <label class="text-[11px] font-semibold text-slate-700">Rain:</label>
-                  <input type="number" id="rain-day-hours" step="0.1" min="0" max="10" value="0"
-                    oninput="InputHmModule.updateRainHours('DAY', this.value)"
-                    class="w-16 px-2 py-1 text-xs font-bold border border-slate-300 rounded bg-white text-right" />
-                </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-600">Rain:</label>
+                <input type="number" id="rain-day-hours" step="0.5" min="0" max="10" value="0"
+                  oninput="InputHmModule.updateRainHours('DAY', this.value)"
+                  class="w-16 px-2 py-1 text-xs font-bold text-center border border-slate-300 rounded-lg bg-white" />
                 <button type="button" onclick="InputHmModule.quickFillActiveUnits('DAY')"
-                  class="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition">
+                  class="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[11px] font-bold rounded-lg">
                   &#9889; Fill Units (W)
                 </button>
                 <button type="button" onclick="InputHmModule.addUnitRow('DAY', true)"
-                  class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-semibold rounded-lg transition">
+                  class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold rounded-lg">
                   + Row
                 </button>
               </div>
             </div>
-
-            <div class="overflow-x-auto max-h-[34rem]">
+            <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse">
-                <thead class="sticky top-0 z-10 bg-slate-100 shadow-sm">
-                  <tr class="border-b border-slate-200 text-[10px] uppercase text-slate-600">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
                     <th class="px-2 py-2 text-center w-8">#</th>
-                    <th class="px-2 py-2 w-36">Unit ID / Model</th>
-                    <th class="px-2 py-2 text-right w-28">Start HM</th>
-                    <th class="px-2 py-2 text-right w-28">End HM</th>
+                    <th class="px-2 py-2 w-32">Unit ID / Model</th>
+                    <th class="px-2 py-2 text-right w-24">Start HM</th>
+                    <th class="px-2 py-2 text-right w-24">End HM</th>
                     <th class="px-2 py-2 text-right w-16">WH</th>
                     <th class="px-2 py-2">BD Info &amp; Status</th>
-                    <th class="px-2 py-2 text-center w-9"></th>
+                    <th class="px-2 py-2 w-8"></th>
                   </tr>
                 </thead>
                 <tbody id="tbody-day-op"></tbody>
@@ -840,195 +743,167 @@
             </div>
           </div>
 
-          <!-- Night Shift Panel -->
-          <div id="panel-night-shift" class="bg-white rounded-xl shadow-sm border border-slate-200 border-t-4 border-t-indigo-600 overflow-hidden transition">
-            <div class="px-3.5 py-2.5 bg-indigo-50/90 border-b border-indigo-200 flex flex-wrap items-center justify-between gap-2">
+          <!-- NIGHT SHIFT -->
+          <div id="panel-night-shift" class="bg-white rounded-2xl shadow-sm border-t-4 border-t-indigo-500 border border-slate-200 overflow-hidden">
+            <div class="px-4 py-3 bg-indigo-50/60 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
               <div class="flex items-center gap-2">
-                <label class="inline-flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" id="chk-night-working" checked
-                    onchange="InputHmModule.toggleShiftWorking('NIGHT', this.checked)"
-                    class="w-4 h-4 text-blue-600 rounded" />
-                  <span class="text-xs font-extrabold text-slate-900 uppercase">NIGHT SHIFT (18:00 - 05:00)</span>
-                </label>
-                <span id="max-hrs-night" class="px-2 py-0.5 text-[11px] font-bold bg-indigo-200 text-indigo-900 rounded">Quota: 10h</span>
+                <input type="checkbox" id="chk-night-working" checked onchange="InputHmModule.toggleShiftWorking('NIGHT', this.checked)"
+                  class="w-4 h-4 rounded text-blue-600" />
+                <span class="text-xs font-extrabold text-slate-900">NIGHT SHIFT (18:00 - 05:00)</span>
+                <span id="max-hrs-night" class="px-2 py-0.5 text-[10px] font-bold bg-indigo-200/80 text-indigo-900 rounded">Quota: 10h</span>
               </div>
-
-              <div class="flex flex-wrap items-center gap-1.5">
-                <div class="flex items-center gap-1 mr-1">
-                  <label class="text-[11px] font-semibold text-slate-700">Rain:</label>
-                  <input type="number" id="rain-night-hours" step="0.1" min="0" max="10" value="0"
-                    oninput="InputHmModule.updateRainHours('NIGHT', this.value)"
-                    class="w-16 px-2 py-1 text-xs font-bold border border-slate-300 rounded bg-white text-right" />
-                </div>
+              <div class="flex items-center gap-2">
+                <label class="text-[11px] font-bold text-slate-600">Rain:</label>
+                <input type="number" id="rain-night-hours" step="0.5" min="0" max="10" value="0"
+                  oninput="InputHmModule.updateRainHours('NIGHT', this.value)"
+                  class="w-16 px-2 py-1 text-xs font-bold text-center border border-slate-300 rounded-lg bg-white" />
                 <button type="button" onclick="InputHmModule.quickFillActiveUnits('NIGHT')"
-                  class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg transition">
+                  class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold rounded-lg">
                   &#9889; Fill Units (W)
                 </button>
                 <button type="button" onclick="InputHmModule.addUnitRow('NIGHT', true)"
-                  class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-semibold rounded-lg transition">
+                  class="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[11px] font-bold rounded-lg">
                   + Row
                 </button>
               </div>
             </div>
-
-            <div class="overflow-x-auto max-h-[34rem]">
+            <div class="overflow-x-auto">
               <table class="w-full text-left border-collapse">
-                <thead class="sticky top-0 z-10 bg-slate-100 shadow-sm">
-                  <tr class="border-b border-slate-200 text-[10px] uppercase text-slate-600">
+                <thead>
+                  <tr class="bg-slate-50 border-b border-slate-200 text-[10px] font-bold uppercase text-slate-500">
                     <th class="px-2 py-2 text-center w-8">#</th>
-                    <th class="px-2 py-2 w-36">Unit ID / Model</th>
-                    <th class="px-2 py-2 text-right w-28">Start HM</th>
-                    <th class="px-2 py-2 text-right w-28">End HM</th>
+                    <th class="px-2 py-2 w-32">Unit ID / Model</th>
+                    <th class="px-2 py-2 text-right w-24">Start HM</th>
+                    <th class="px-2 py-2 text-right w-24">End HM</th>
                     <th class="px-2 py-2 text-right w-16">WH</th>
                     <th class="px-2 py-2">BD Info &amp; Status</th>
-                    <th class="px-2 py-2 text-center w-9"></th>
+                    <th class="px-2 py-2 w-8"></th>
                   </tr>
                 </thead>
                 <tbody id="tbody-night-op"></tbody>
               </table>
             </div>
           </div>
-
         </div>
 
-        <!-- Sticky Footer Bar: Live Summary & Save Action -->
-        <div class="sticky bottom-3 z-20 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4">
-          <div class="space-y-0.5">
-            <div id="op-live-summary" class="text-xs font-bold text-slate-100">
-              Active Fleet: 0 Units | Day WH: 0.0h | Night WH: 0.0h | Total WH: 0.0h | Est. Fleet Rain: 0.0h
-            </div>
-            <div id="op-status-msg" class="text-[11px] text-slate-400">
-              Rows with blank End HM are automatically skipped (counted as Standby / BD). Press Ctrl+S anytime to save.
-            </div>
+        <!-- Bottom Save Bar -->
+        <div class="bg-slate-900 text-white rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-lg">
+          <div>
+            <div id="op-live-summary" class="text-xs font-extrabold text-emerald-400">Active Fleet: 0 Units | Total WH: 0.0h</div>
+            <div id="op-status-msg" class="text-[11px] text-slate-300 mt-0.5">Select date to load operational records.</div>
           </div>
-
           <button type="button" id="btn-save-op" onclick="InputHmModule.saveAll()"
-            class="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold rounded-lg shadow-lg transition whitespace-nowrap">
+            class="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-extrabold rounded-xl shadow-md transition">
             Save Daily Operational Data (Ctrl+S)
           </button>
         </div>
-      </section>
+      </div>
 
-      <!-- ===================================================== -->
-      <!-- TAB 5: UNIT POPULATION REGISTRY                       -->
-      <!-- ===================================================== -->
-      <section id="tab-population" class="app-tab-panel hidden space-y-5">
-
-        <!-- Monthly Roster Period & Lock Status Control -->
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 space-y-3">
-          <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-3">
+      <!-- ======================================================================
+           TAB 5: UNIT POPULATION & MONTHLY FLEET ROSTER LOCK
+           ====================================================================== -->
+      <div id="tab-population" class="app-tab-panel hidden space-y-5">
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 space-y-4">
+          <div class="flex flex-wrap items-end justify-between gap-4">
+            <div class="flex flex-wrap items-end gap-3">
               <div>
-                <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Roster Period (Month)</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Roster Period (YYYY-MM)</label>
                 <input type="month" id="pop-month-picker" onchange="PopulationModule.loadMonth()"
-                  class="px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                  class="px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl" />
               </div>
-
-              <div class="pt-4 sm:pt-0 flex flex-wrap items-center gap-2">
-                <span id="pop-lock-badge" class="px-3 py-1.5 text-xs font-extrabold rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
-                  Loading Roster Status...
+              <div>
+                <span id="pop-lock-badge" class="px-3 py-1.5 text-xs font-extrabold rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  Loading Roster Lock...
                 </span>
-                <span id="pop-inherited-info" class="text-[11px] text-slate-500 font-medium"></span>
+                <div id="pop-inherited-info" class="text-[11px] text-slate-500 mt-1">Checking snapshot...</div>
               </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="btn-pull-master" onclick="PopulationModule.pullFromMaster()"
+                class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 transition">
+                Sync Roster
+              </button>
               <button type="button" id="btn-copy-prev-roster" onclick="PopulationModule.copyPreviousRoster()"
-                class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-sm transition">
+                class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-xl border border-indigo-200 disabled:opacity-50 transition">
                 Copy / Finalize from Previous Month
+              </button>
+              <button type="button" id="btn-pop-export-csv" onclick="PopulationModule.exportCsv()"
+                class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition">
+                Export CSV
+              </button>
+              <button type="button" id="btn-save-bulk-status" onclick="PopulationModule.saveBulkStatus()"
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl shadow-sm transition">
+                Save Roster Changes
               </button>
             </div>
           </div>
 
           <div id="pop-lock-banner" class="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2">
-            <span class="font-bold text-blue-600">&#9432;</span>
-            <p id="pop-lock-desc" class="leading-relaxed">
-              Select a roster month to manage On-Hired (W/SW) and Off-Hired (OH) fleet allocation.
-            </p>
+            <span>&#128274;</span>
+            <span id="pop-lock-desc">Loading roster lock policy...</span>
           </div>
-        </div>
 
-        <div id="pop-status-msg" class="text-sm"></div>
+          <!-- 4 Status Summary Cards -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200">
+              <div class="text-[10px] font-bold uppercase text-emerald-700">W &bull; Working (On-Hired)</div>
+              <div id="pop-count-w" class="text-2xl font-extrabold text-emerald-900 mt-0.5">0</div>
+              <div class="text-[10px] text-emerald-700">Included in KPI &amp; BD Upload</div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-blue-50 border border-blue-200">
+              <div class="text-[10px] font-bold uppercase text-blue-700">SW &bull; Standby Working (On-Hired)</div>
+              <div id="pop-count-sw" class="text-2xl font-extrabold text-blue-900 mt-0.5">0</div>
+              <div class="text-[10px] text-blue-700">Field Hot-Spare &bull; Included in KPI</div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-amber-50 border border-amber-200">
+              <div class="text-[10px] font-bold uppercase text-amber-800">OH &bull; Off Hired (Yard / Long-BD)</div>
+              <div id="pop-count-oh" class="text-2xl font-extrabold text-amber-900 mt-0.5">0</div>
+              <div class="text-[10px] text-amber-800">Excluded from KPI &amp; BD Upload</div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-slate-100 border border-slate-300">
+              <div class="text-[10px] font-bold uppercase text-slate-600">S &bull; Scrap / Demobilized</div>
+              <div id="pop-count-s" class="text-2xl font-extrabold text-slate-800 mt-0.5">0</div>
+              <div class="text-[10px] text-slate-600">Decommissioned &bull; Excluded</div>
+            </div>
+          </div>
 
-        <!-- 4 Fleet Status Summary Cards (On-Hired vs Off-Hired) -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div class="bg-white p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between">
-            <div>
-              <div class="text-xs font-bold text-slate-800">Working (W)</div>
-              <div class="text-[10px] font-semibold text-emerald-700">On-Hired &bull; Active KPI</div>
-            </div>
-            <span id="pop-count-w" class="text-xl font-extrabold text-emerald-600">0</span>
-          </div>
-          <div class="bg-white p-3.5 rounded-xl border border-blue-200 flex items-center justify-between">
-            <div>
-              <div class="text-xs font-bold text-slate-800">Standby Working (SW)</div>
-              <div class="text-[10px] font-semibold text-blue-700">On-Hired &bull; Hot Spare KPI</div>
-            </div>
-            <span id="pop-count-sw" class="text-xl font-extrabold text-blue-600">0</span>
-          </div>
-          <div class="bg-white p-3.5 rounded-xl border border-amber-200 flex items-center justify-between">
-            <div>
-              <div class="text-xs font-bold text-slate-800">Off Hired (OH)</div>
-              <div class="text-[10px] font-semibold text-amber-700">Yard / Long BD &bull; Excluded</div>
-            </div>
-            <span id="pop-count-oh" class="text-xl font-extrabold text-amber-600">0</span>
-          </div>
-          <div class="bg-white p-3.5 rounded-xl border border-rose-200 flex items-center justify-between">
-            <div>
-              <div class="text-xs font-bold text-slate-800">Scrap / Demob (S)</div>
-              <div class="text-[10px] font-semibold text-rose-700">Inactive &bull; Excluded</div>
-            </div>
-            <span id="pop-count-s" class="text-xl font-extrabold text-rose-600">0</span>
-          </div>
-        </div>
-
-        <!-- Site Unit Population Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <!-- Filter & Search -->
+          <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex flex-wrap items-center gap-2">
-              <h3 class="text-sm font-bold text-slate-800">Monthly Fleet Roster &amp; Population</h3>
-              <span id="pop-total-badge" class="px-2.5 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700 rounded-full">0 On-Hired</span>
-              <button type="button" id="btn-pull-master" onclick="PopulationModule.pullFromMaster()"
-                class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold rounded-lg transition">
-                Sync Roster
-              </button>
-              <button type="button" id="btn-pop-export-csv" onclick="PopulationModule.exportCsv()"
-                class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer">
-                <span>Export CSV</span>
-              </button>
-            </div>
-
-            <div class="flex flex-wrap items-center gap-2">
+              <input type="text" id="pop-search-input" oninput="PopulationModule.renderTable()" placeholder="Search Unit ID, Model, Brand..."
+                class="px-3 py-1.5 text-xs border border-slate-300 rounded-xl w-60" />
               <select id="pop-status-filter" onchange="PopulationModule.renderTable()"
-                class="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white">
-                <option value="ALL">All Statuses</option>
+                class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
+                <option value="ALL">All Roster Statuses</option>
                 <option value="ON_HIRED">On-Hired Only (W + SW)</option>
                 <option value="W">W (Working)</option>
                 <option value="SW">SW (Standby Working)</option>
                 <option value="OH">OH (Off Hired)</option>
+                <option value="PENDING_OH">Pending Off-Hire Scheduled</option>
                 <option value="S">S (Scrap)</option>
-                <option value="PENDING_OH">Pending Off-Hire</option>
               </select>
-              <input type="text" id="pop-search-input" oninput="PopulationModule.renderTable()"
-                placeholder="Search Unit ID / Model / Brand..."
-                class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg" />
-              <button type="button" id="btn-save-bulk-status" onclick="PopulationModule.saveBulkStatus()"
-                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow transition">
-                Save Roster Changes
-              </button>
             </div>
+            <span id="pop-total-badge" class="px-3 py-1 text-xs font-extrabold bg-blue-50 text-blue-800 rounded-xl border border-blue-200">
+              0 On-Hired / 0 Total
+            </span>
           </div>
-          <div class="overflow-x-auto max-h-[34rem]">
+          <p id="pop-status-msg" class="text-xs text-slate-500">Ready.</p>
+        </div>
+
+        <!-- Population Roster Table -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
-              <thead class="sticky top-0 bg-slate-50 shadow-sm z-10">
-                <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
                   <th class="px-4 py-2.5">Unit ID</th>
                   <th class="px-4 py-2.5">Category</th>
                   <th class="px-4 py-2.5">Equipment</th>
                   <th class="px-4 py-2.5">Brand</th>
                   <th class="px-4 py-2.5">Model</th>
                   <th class="px-4 py-2.5">Roster Status</th>
-                  <th class="px-4 py-2.5">Mid-Month Governance / Notes</th>
+                  <th class="px-4 py-2.5">Mid-Month Governance &amp; Notes</th>
                 </tr>
               </thead>
               <tbody id="tbody-population-list"></tbody>
@@ -1036,87 +911,70 @@
           </div>
         </div>
 
-        <!-- Audit Log Mutasi Unit Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-            <div>
-              <h3 class="text-sm font-bold text-slate-800">Fleet Roster Mutation Audit Log</h3>
-              <p class="text-[11px] text-slate-500">Permanent audit trail of Pending Off-Hire requests, Emergency Pull-Ins, and monthly roster locks</p>
-            </div>
-            <span id="pop-audit-count" class="px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded-full">0 Logs</span>
+        <!-- Roster Mutation Audit Log -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-700">Roster Mutation Audit Trail (On-Hired &harr; Off-Hired)</h3>
+            <span id="pop-audit-count" class="px-2.5 py-0.5 text-xs font-bold bg-slate-200 text-slate-700 rounded-full">0 Logs</span>
           </div>
-          <div class="overflow-x-auto max-h-64">
+          <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
-              <thead class="sticky top-0 bg-slate-50 shadow-sm">
-                <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
-                  <th class="px-3 py-2">Timestamp</th>
-                  <th class="px-3 py-2">Planner / User</th>
-                  <th class="px-3 py-2">Unit ID</th>
-                  <th class="px-3 py-2">Action Type</th>
-                  <th class="px-3 py-2">Technical Justification &amp; Replacement Detail</th>
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase text-slate-500">
+                  <th class="px-3 py-2.5">Timestamp</th>
+                  <th class="px-3 py-2.5">User</th>
+                  <th class="px-3 py-2.5">Unit ID</th>
+                  <th class="px-3 py-2.5">Action Type</th>
+                  <th class="px-3 py-2.5">Technical Justification &amp; Replacement Detail</th>
                 </tr>
               </thead>
-              <tbody id="tbody-pop-audit-logs">
-                <tr>
-                  <td colspan="5" class="px-4 py-5 text-center text-xs text-slate-400">No roster mutations recorded for this period.</td>
-                </tr>
-              </tbody>
+              <tbody id="tbody-pop-audit-logs"></tbody>
             </table>
           </div>
         </div>
-      </section>
 
-      <!-- Mid-Month One-Way Roster Governance Modal -->
-      <div id="modal-roster-action" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-          <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+        <!-- Modal for Pending Off-Hire & Emergency Pull-In -->
+        <div id="modal-roster-action" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
             <div>
-              <h3 id="modal-roster-title" class="text-sm font-extrabold uppercase tracking-wide">Roster Governance Action</h3>
-              <p id="modal-roster-subtitle" class="text-[11px] text-slate-300 mt-0.5">One-Way Mid-Month Roster Rule</p>
+              <h3 id="modal-roster-title" class="text-base font-extrabold text-slate-900">Roster Governance Action</h3>
+              <p id="modal-roster-subtitle" class="text-xs text-slate-500 mt-0.5"></p>
             </div>
-            <button type="button" onclick="PopulationModule.closeActionModal()" class="text-slate-400 hover:text-white text-lg font-bold">&times;</button>
-          </div>
 
-          <div class="p-5 space-y-4 text-xs">
             <input type="hidden" id="modal-roster-unit-id" />
             <input type="hidden" id="modal-roster-mode" />
 
-            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-              <span class="text-slate-500 font-semibold">Selected Unit:</span>
-              <span id="modal-roster-unit-label" class="font-extrabold text-slate-900 text-sm">-</span>
-            </div>
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-bold text-slate-800" id="modal-roster-unit-label"></div>
 
             <div id="modal-roster-pull-fields" class="hidden space-y-3">
               <div>
-                <label class="block font-bold text-slate-700 uppercase mb-1">Activate As Status</label>
-                <select id="modal-roster-target-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white">
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Target On-Hired Status</label>
+                <select id="modal-roster-target-status" class="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-white">
                   <option value="W">W (Working - Active Production)</option>
-                  <option value="SW">SW (Standby Working - Hot Spare)</option>
+                  <option value="SW">SW (Standby Working - Field Spare)</option>
                 </select>
               </div>
-
               <div>
-                <label class="block font-bold text-slate-700 uppercase mb-1">Replacing Broken On-Hired Unit ID <span class="text-rose-600">*</span></label>
-                <select id="modal-roster-replaced-unit" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white">
-                  <option value="">-- Select On-Hired Unit Being Replaced --</option>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Replaces Which Broken On-Hired Unit? (Mandatory)</label>
+                <select id="modal-roster-replaced-unit" class="w-full px-3 py-2 text-xs font-bold border border-slate-300 rounded-xl bg-white">
+                  <option value="">-- Select Broken On-Hired Unit --</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label class="block font-bold text-slate-700 uppercase mb-1">Technical Reason / WO Reference <span class="text-rose-600">*</span></label>
-              <textarea id="modal-roster-reason" rows="3"
-                placeholder="e.g., Major hydraulic pump failure (WO #4412) - scheduled for Off-Hire effective 1st of next month..."
-                class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+              <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Technical Justification / WO Reference (Mandatory)</label>
+              <textarea id="modal-roster-reason" rows="3" placeholder="e.g., Major hydraulic pump failure (WO #4412), scheduled for workshop overhaul..."
+                class="w-full px-3 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500"></textarea>
             </div>
 
-            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div class="flex justify-end gap-2 pt-2">
               <button type="button" onclick="PopulationModule.closeActionModal()"
-                class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">
+                class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">
                 Cancel
               </button>
-              <button type="button" id="btn-modal-roster-submit" onclick="PopulationModule.submitActionModal()"
-                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition">
+              <button type="button" onclick="PopulationModule.submitActionModal()"
+                class="px-4 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm">
                 Confirm &amp; Record Audit Log
               </button>
             </div>
@@ -1124,29 +982,25 @@
         </div>
       </div>
 
-      <!-- ===================================================== -->
-      <!-- TAB 6: EXECUTIVE REPORT (SUPERADMIN & PLANNER ONLY)   -->
-      <!-- ===================================================== -->
-      <section id="tab-report" class="app-tab-panel hidden space-y-5">
-
-        <!-- Report Control Panel (English System UI) -->
-        <div id="report-control-panel" class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
-          <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+      <!-- ======================================================================
+           TAB 6: EXECUTIVE PDF REPORT GENERATOR
+           ====================================================================== -->
+      <div id="tab-report" class="app-tab-panel hidden space-y-6">
+        <!-- Control Panel -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 sm:p-6 space-y-5">
+          <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 class="text-base font-bold text-slate-800">Executive PDF Report Generator (A4 Landscape)</h2>
-              <p class="text-xs text-slate-500 mt-0.5">
-                Select <strong>Weekly Operational Report (Tactical)</strong> or <strong>Monthly Management Detail Report (Comprehensive)</strong> &mdash; generates a structured Indonesian PDF report.
-              </p>
+              <h2 class="text-base font-extrabold text-slate-900">Executive PDF Report Generator (A4 Landscape)</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Select <strong>Weekly Operational Report (Tactical)</strong> or <strong>Monthly Management Detail Report (Comprehensive)</strong> &mdash; generates a structured Indonesian PDF report.</p>
             </div>
 
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2.5">
               <button type="button" id="btn-report-ai" disabled onclick="ReportModule.enhanceWithAi()"
-                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-sm transition">
-                <span>&#10024;</span>
-                <span>Generate AI Analysis (Gemini)</span>
+                class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl shadow-sm transition">
+                <span>&#10024;</span><span>Generate AI Analysis (Gemini)</span>
               </button>
               <button type="button" id="btn-download-pdf" disabled onclick="ReportModule.downloadPdf()"
-                class="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow transition">
+                class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 text-white text-xs font-bold rounded-xl shadow-sm transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -1155,301 +1009,247 @@
             </div>
           </div>
 
-          <!-- Report Type Selector: Weekly vs Monthly Management Detail -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <!-- Report Mode Selector Cards -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <button type="button" id="btn-mode-weekly" onclick="ReportModule.setReportType('WEEKLY')"
               class="text-left p-3.5 rounded-xl border-2 border-slate-200 bg-slate-50 hover:border-blue-400 transition">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-extrabold uppercase text-slate-800">1. Weekly Operational Report (Tactical)</span>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-extrabold text-slate-900">1. WEEKLY OPERATIONAL REPORT (TACTICAL)</span>
                 <span id="badge-mode-weekly" class="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-200 text-slate-600">Tactical Focus</span>
               </div>
-              <p class="text-[11px] text-slate-500 mt-1">
-                7-day operational review: Weekly KPIs, Trend &amp; Pareto Charts, Active Open Breakdowns, Model Summary, and Watchlist Units (PA &lt; 85%).
-              </p>
+              <p class="text-[11px] text-slate-500 mt-1">Concise 2-page operational review: Weekly KPIs, Trend &amp; Top 5 Pareto Charts, Active Open Breakdowns, Model Summary, and Watchlist Units (PA &lt; 85%).</p>
             </button>
 
             <button type="button" id="btn-mode-monthly" onclick="ReportModule.setReportType('MONTHLY')"
               class="text-left p-3.5 rounded-xl border-2 border-blue-600 bg-blue-50/60 transition">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-extrabold uppercase text-blue-900">2. Monthly Management Detail Report (Comprehensive)</span>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-extrabold text-slate-900">2. MONTHLY MANAGEMENT DETAIL REPORT (COMPREHENSIVE)</span>
                 <span id="badge-mode-monthly" class="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-600 text-white">Active &bull; Full Audit</span>
               </div>
-              <p class="text-[11px] text-slate-600 mt-1">
-                Structured Executive Paper (Chapters I&ndash;IV): Target Gap Analysis, Time Distribution, Component Pareto Contribution, Full Fleet Audit, and Strategic Action Plan.
-              </p>
+              <p class="text-[11px] text-slate-500 mt-1">Comprehensive multi-page executive paper (Chapters I&ndash;IV): Plain-language KPI Guide, AI Narratives per Chapter, Time Allocation Table, Top 10 Pareto, Daily Log, Full Fleet Audit &amp; Roster Mutations.</p>
             </button>
           </div>
 
-          <!-- Period & Model Filter -->
-          <div class="flex flex-wrap items-end justify-between gap-4 pt-1">
+          <!-- Filter Bar -->
+          <div class="flex flex-wrap items-end justify-between gap-4">
             <div class="flex flex-wrap items-end gap-3">
               <div>
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Quick Month</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Quick Month</label>
                 <input type="month" id="rep-month-picker" onchange="ReportModule.applyMonthPicker(this.value)"
-                  class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl" />
               </div>
               <div>
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">From Date</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">From Date</label>
                 <input type="date" id="rep-start-date" onchange="ReportModule.markStale()"
-                  class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl" />
               </div>
               <div>
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">To Date</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">To Date</label>
                 <input type="date" id="rep-end-date" onchange="ReportModule.markStale()"
-                  class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl" />
               </div>
               <div>
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Model Filter</label>
+                <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Model Filter</label>
                 <select id="rep-filter-model" onchange="ReportModule.markStale()"
-                  class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
+                  class="px-3 py-2 text-xs font-semibold border border-slate-300 rounded-xl bg-white">
                   <option value="ALL">All Unit Models</option>
                 </select>
               </div>
               <button type="button" id="btn-load-report" onclick="ReportModule.load()"
-                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+                class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition">
                 Load Report Data
               </button>
             </div>
 
-            <div class="flex flex-wrap items-center gap-1.5">
+            <div class="flex flex-wrap items-center gap-2">
               <button type="button" onclick="ReportModule.applyDatePreset('LAST_7')"
-                class="px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">
+                class="px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200">
                 Last 7 Days
               </button>
               <button type="button" onclick="ReportModule.applyDatePreset('MTD')"
-                class="px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">
+                class="px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200">
                 Month-to-Date (MTD)
               </button>
               <button type="button" onclick="ReportModule.applyDatePreset('LAST_MONTH')"
-                class="px-2.5 py-1 text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">
+                class="px-2.5 py-1.5 text-xs font-semibold rounded-lg border bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200">
                 Full Last Month
               </button>
             </div>
           </div>
 
-          <!-- Optional Field Notes & Custom Chapter Narrative Editor -->
+          <!-- Special Notes & Optional Narrative Customizer -->
           <div class="space-y-2">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <label class="block text-[11px] font-semibold text-slate-500 uppercase">
-                Special Field / Sparepart Notes (Optional &mdash; included in Chapter IV of PDF)
-              </label>
-              <button type="button" id="btn-toggle-edit-narratives" onclick="ReportModule.toggleNarrativeEditor()"
-                class="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline">
+            <div class="flex items-center justify-between">
+              <label for="rep-custom-notes" class="block text-[11px] font-bold uppercase text-slate-500">Special Field / Sparepart Notes (Optional &mdash; Included in Chapter IV of PDF)</label>
+              <button type="button" onclick="ReportModule.toggleNarrativeEditor()"
+                class="text-xs font-bold text-indigo-600 hover:text-indigo-800 underline">
                 &#9998; Customize Chapter Narratives (Optional)
               </button>
             </div>
             <textarea id="rep-custom-notes" rows="2" oninput="ReportModule.syncCustomNotes()"
               placeholder="e.g., Unit EX-1320 awaiting main pump seal kit shipment from vendor (ETA 16 Nov 2026)..."
-              class="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+              class="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:border-blue-500"></textarea>
 
-            <!-- Collapsible Narrative Editor for Chapters I - IV -->
-            <div id="rep-edit-narratives-box" class="hidden p-3.5 rounded-xl bg-indigo-50/60 border border-indigo-200 space-y-2.5">
-              <div class="text-[11px] font-extrabold text-indigo-900 uppercase">
-                Manual Narrative Override (Edits sync immediately to Preview &amp; PDF)
-              </div>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">BAB I &mdash; Executive Summary</label>
-                  <textarea id="edit-nar-bab1" rows="3" oninput="ReportModule.onManualNarrativeEdit()"
-                    class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"></textarea>
-                </div>
-                <div>
-                  <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">BAB II &mdash; Trend &amp; Pareto Explanation (Monthly)</label>
-                  <textarea id="edit-nar-bab2" rows="3" oninput="ReportModule.onManualNarrativeEdit()"
-                    class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"></textarea>
-                </div>
-                <div>
-                  <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">BAB III &mdash; Fleet &amp; Model Evaluation (Monthly)</label>
-                  <textarea id="edit-nar-bab3" rows="3" oninput="ReportModule.onManualNarrativeEdit()"
-                    class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"></textarea>
-                </div>
-                <div>
-                  <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">BAB IV &mdash; Management Conclusion (Monthly)</label>
-                  <textarea id="edit-nar-bab4" rows="3" oninput="ReportModule.onManualNarrativeEdit()"
-                    class="w-full px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg bg-white"></textarea>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="flex items-center justify-between text-xs pt-1">
-            <span id="rep-status-msg" class="text-slate-500">Select report mode &amp; period above, then click <strong>Load Report Data</strong> to preview.</span>
-            <span id="rep-ai-badge" class="px-2.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">Analysis Engine: Standby</span>
-          </div>
-        </div>
-
-        <!-- Empty Placeholder Before Clicking "Load Report Data" -->
-        <div id="rep-empty-placeholder" class="bg-white p-10 rounded-xl shadow-sm border-2 border-dashed border-slate-300 text-center space-y-2">
-          <div class="text-sm font-bold text-slate-700">Executive Report Preview Not Loaded Yet</div>
-          <p class="text-xs text-slate-500 max-w-lg mx-auto">
-            Choose <strong>Weekly Operational Report</strong> or <strong>Monthly Management Detail Report</strong>, set your date range and model filter above, then click <strong>Load Report Data</strong> to generate the report preview.
-          </p>
-        </div>
-
-        <!-- =================================================== -->
-        <!-- INDONESIAN EXECUTIVE PAPER PREVIEW (A4 LANDSCAPE)   -->
-        <!-- =================================================== -->
-        <div id="pdf-printable-sheet" class="hidden bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-6">
-
-          <!-- Kop Resmi Perusahaan (Formal Indonesian Paper Header) -->
-          <div class="flex flex-wrap items-start justify-between gap-4 border-b-2 border-slate-900 pb-4">
-            <div class="flex items-center gap-3.5">
-              <img src="logo-ktc.png" alt="PT. KTC Coal Mining &amp; Energy"
-                onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');"
-                class="h-14 w-auto object-contain" />
-              <div class="hidden w-12 h-12 rounded-xl bg-slate-900 text-white font-extrabold flex items-center justify-center text-xs">
-                KTC
+            <!-- Collapsible Manual Narrative Override -->
+            <div id="rep-edit-narratives-box" class="hidden p-4 rounded-xl bg-slate-50 border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">BAB I &bull; Executive Summary Narrative</label>
+                <textarea id="edit-nar-bab1" rows="3" oninput="ReportModule.onManualNarrativeEdit()" class="w-full p-2 text-xs border border-slate-300 rounded-lg"></textarea>
               </div>
               <div>
-                <div class="text-xs font-extrabold text-blue-700 tracking-wider uppercase">PT. KTC COAL MINING &amp; ENERGY</div>
-                <h2 id="rep-doc-main-title" class="text-lg font-extrabold text-slate-900 tracking-tight uppercase leading-tight">
-                  LAPORAN BULANAN EKSEKUTIF PERFORMA &amp; RELIABILITAS ARMADA
-                </h2>
-                <p id="rep-doc-subtitle" class="text-[11px] text-slate-500">
-                  Evaluasi Kesiapan Mekanis, Pareto Kerusakan Komponen &amp; Audit Performa Unit
-                </p>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">BAB II &bull; Trend &amp; Pareto Explanation</label>
+                <textarea id="edit-nar-bab2" rows="3" oninput="ReportModule.onManualNarrativeEdit()" class="w-full p-2 text-xs border border-slate-300 rounded-lg"></textarea>
               </div>
-            </div>
-
-            <div class="text-right text-[11px] space-y-0.5 bg-slate-50 px-3.5 py-2 rounded-lg border border-slate-200">
-              <div><span class="text-slate-500 font-medium">Kategori Dokumen:</span> <strong id="rep-doc-category" class="text-blue-700">BULANAN MANAJEMEN (DETAIL)</strong></div>
-              <div><span class="text-slate-500 font-medium">Site Operasional:</span> <strong id="rep-doc-site" class="text-slate-900">TTLP</strong></div>
-              <div><span class="text-slate-500 font-medium">Periode Evaluasi:</span> <strong id="rep-doc-period" class="text-slate-900">-</strong></div>
-              <div><span class="text-slate-500 font-medium">Dicetak Oleh:</span> <strong id="rep-doc-printed-by" class="text-slate-900">-</strong> (<span id="rep-doc-printed-at">-</span>)</div>
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">BAB III &bull; Model &amp; Fleet Evaluation</label>
+                <textarea id="edit-nar-bab3" rows="3" oninput="ReportModule.onManualNarrativeEdit()" class="w-full p-2 text-xs border border-slate-300 rounded-lg"></textarea>
+              </div>
+              <div>
+                <label class="block text-[10px] font-bold uppercase text-slate-600 mb-1">BAB IV &bull; Management Conclusion</label>
+                <textarea id="edit-nar-bab4" rows="3" oninput="ReportModule.onManualNarrativeEdit()" class="w-full p-2 text-xs border border-slate-300 rounded-lg"></textarea>
+              </div>
             </div>
           </div>
 
-          <!-- BAB I: RINGKASAN EKSEKUTIF & PENCAPAIAN KPI -->
-          <div class="space-y-3">
-            <h3 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1">
-              BAB I. RINGKASAN EKSEKUTIF &amp; PENCAPAIAN KPI ARMADA
-            </h3>
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+            <p id="rep-status-msg" class="text-xs text-slate-500">Select report mode &amp; period above, then click <strong>Load Report Data</strong> to preview.</p>
+            <span id="rep-ai-badge" class="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 text-slate-700">Analysis Engine: Standby</span>
+          </div>
+        </div>
 
-            <!-- Panduan Singkat Membaca Indikator KPI (Bahasa Awam — Khusus Mode Bulanan Manajemen) -->
-            <div id="rep-monthly-kpi-guide" class="p-3 rounded-lg bg-slate-50 border border-slate-300 text-[11px] text-slate-700 space-y-1">
-              <div class="font-extrabold text-slate-900 uppercase text-[10px]">
-                Panduan Membaca Indikator Kinerja Utama (KPI) Armada:
+        <!-- Placeholder Before Clicking Load Report Data -->
+        <div id="rep-empty-placeholder" class="bg-white rounded-2xl shadow-sm border-2 border-dashed border-slate-300 p-12 text-center space-y-2">
+          <div class="w-12 h-12 mx-auto rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl font-bold">&#128196;</div>
+          <h3 class="text-sm font-extrabold text-slate-800">Report Preview Not Loaded Yet</h3>
+          <p class="text-xs text-slate-500 max-w-md mx-auto">Choose <strong>Weekly</strong> or <strong>Monthly</strong> mode and date range above, then click <strong>Load Report Data</strong> to generate the formal executive preview and unlock PDF download.</p>
+        </div>
+
+        <!-- ====================================================================
+             PRINTABLE FORMAL INDONESIAN PAPER SHEET (HIDDEN UNTIL LOADED)
+             ==================================================================== -->
+        <div id="pdf-printable-sheet" class="hidden bg-white rounded-2xl shadow-md border border-slate-200 p-6 sm:p-8 space-y-6">
+          <!-- Official Document Kop -->
+          <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b-2 border-slate-900">
+            <div class="flex items-center gap-3.5">
+              <img src="logo-ktc.png" alt="KTC" class="h-12 w-auto object-contain" onerror="this.style.display='none'" />
+              <div>
+                <div class="text-xs font-extrabold text-blue-700 tracking-wide">PT. KTC COAL MINING &amp; ENERGY</div>
+                <h2 id="rep-doc-main-title" class="text-lg font-extrabold text-slate-900">LAPORAN BULANAN EKSEKUTIF PERFORMA &amp; RELIABILITAS ARMADA</h2>
+                <p id="rep-doc-subtitle" class="text-xs text-slate-500">Evaluasi Kesiapan Mekanis, Pareto Kerusakan Komponen &amp; Audit Performa Seluruh Unit</p>
               </div>
-              <div class="grid grid-cols-1 md:grid-cols-5 gap-2 pt-0.5">
-                <div class="bg-white p-2 rounded border border-slate-200">
-                  <strong class="text-blue-800">PA (Physical Availability):</strong> Persentase kesiapan fisik unit untuk bekerja dari total jam jadwal (tidak rusak).
-                </div>
-                <div class="bg-white p-2 rounded border border-slate-200">
-                  <strong class="text-emerald-800">MA (Mechanical Availability):</strong> Ketangguhan mekanis unit saat dioperasikan (rasio jam kerja vs kerusakan mendadak).
-                </div>
-                <div class="bg-white p-2 rounded border border-slate-200">
-                  <strong class="text-amber-800">UA (Use of Availability):</strong> Efektivitas tim operasi memanfaatkan unit yang sudah dinyatakan siap pakai (tidak standby).
-                </div>
-                <div class="bg-white p-2 rounded border border-slate-200">
-                  <strong class="text-slate-900">MTTR (Avg Repair Time):</strong> Rata-rata durasi waktu yang dibutuhkan mekanik untuk menyelesaikan 1 kali perbaikan.
-                </div>
-                <div class="bg-white p-2 rounded border border-slate-200">
-                  <strong class="text-indigo-800">MTBR (Avg Between BD):</strong> Rata-rata ketahanan jam operasi unit sebelum mengalami kerusakan mendadak berikutnya.
-                </div>
+            </div>
+            <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs space-y-0.5">
+              <div>Kategori Dokumen: <strong id="rep-doc-category" class="text-blue-700">BULANAN MANAJEMEN (DETAIL)</strong></div>
+              <div>Site Operasional: <strong id="rep-doc-site">TTLP (Semua Model)</strong></div>
+              <div>Periode Evaluasi: <strong id="rep-doc-period">-</strong></div>
+              <div>Dicetak Oleh: <strong id="rep-doc-printed-by">-</strong> (<span id="rep-doc-printed-at">-</span>)</div>
+            </div>
+          </div>
+
+          <!-- BAB I -->
+          <div class="space-y-4">
+            <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-300 pb-1">BAB I. RINGKASAN EKSEKUTIF &amp; PENCAPAIAN KPI ARMADA</h3>
+
+            <!-- Monthly Plain-Language KPI Glossary -->
+            <div id="rep-monthly-kpi-guide" class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+              <div class="font-extrabold text-slate-800 uppercase text-[11px]">Panduan Membaca Indikator Kinerja Utama (KPI) Armada:</div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-[11px] text-slate-600">
+                <div><strong class="text-blue-800">PA (Physical Availability):</strong> Persentase kesiapan fisik unit tidak rusak.</div>
+                <div><strong class="text-blue-800">MA (Mechanical Availability):</strong> Ketangguhan mekanis unit saat dioperasikan.</div>
+                <div><strong class="text-blue-800">UA (Use of Availability):</strong> Tingkat pemanfaatan unit siap pakai oleh operasi.</div>
+                <div><strong class="text-blue-800">MTTR (Avg Repair Time):</strong> Rata-rata durasi mekanik memperbaiki kerusakan.</div>
+                <div><strong class="text-blue-800">MTBR (Avg Between BD):</strong> Rata-rata jam ketahanan unit bekerja antar kerusakan.</div>
               </div>
             </div>
 
-            <!-- 5 Kartu KPI Eksekutif -->
-            <div class="grid grid-cols-5 gap-3">
-              <div class="p-3 rounded-lg border border-slate-300 bg-slate-50/50">
-                <div class="text-[10px] font-bold text-slate-500 uppercase">Physical Availability (PA)</div>
-                <div id="rep-val-pa" class="text-xl font-extrabold text-slate-900 mt-0.5">0.00%</div>
-                <div id="rep-sub-pa" class="text-[10px] font-semibold text-slate-600 mt-0.5">Target &ge; 85%</div>
+            <!-- 5 KPI Cards -->
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[10px] font-bold text-slate-500">PHYSICAL AVAILABILITY (PA)</div>
+                <div id="rep-val-pa" class="text-lg font-extrabold text-slate-900 mt-0.5">0.00%</div>
+                <div id="rep-sub-pa" class="text-[10px] font-bold text-emerald-700 mt-0.5">Target &ge; 85%</div>
               </div>
-              <div class="p-3 rounded-lg border border-slate-300 bg-slate-50/50">
-                <div class="text-[10px] font-bold text-slate-500 uppercase">Mechanical Availability (MA)</div>
-                <div id="rep-val-ma" class="text-xl font-extrabold text-slate-900 mt-0.5">0.00%</div>
-                <div id="rep-sub-ma" class="text-[10px] font-semibold text-slate-600 mt-0.5">Target &ge; 85%</div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[10px] font-bold text-slate-500">MECHANICAL AVAILABILITY (MA)</div>
+                <div id="rep-val-ma" class="text-lg font-extrabold text-slate-900 mt-0.5">0.00%</div>
+                <div id="rep-sub-ma" class="text-[10px] font-bold text-emerald-700 mt-0.5">Target &ge; 85%</div>
               </div>
-              <div class="p-3 rounded-lg border border-slate-300 bg-slate-50/50">
-                <div class="text-[10px] font-bold text-slate-500 uppercase">Use of Availability (UA)</div>
-                <div id="rep-val-ua" class="text-xl font-extrabold text-slate-900 mt-0.5">0.00%</div>
-                <div id="rep-sub-ua" class="text-[10px] font-semibold text-slate-600 mt-0.5">Target &ge; 85%</div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[10px] font-bold text-slate-500">USE OF AVAILABILITY (UA)</div>
+                <div id="rep-val-ua" class="text-lg font-extrabold text-slate-900 mt-0.5">0.00%</div>
+                <div id="rep-sub-ua" class="text-[10px] font-bold text-emerald-700 mt-0.5">Target &ge; 85%</div>
               </div>
-              <div class="p-3 rounded-lg border border-slate-300 bg-slate-50/50">
-                <div class="text-[10px] font-bold text-slate-500 uppercase">MTTR (Avg Repair)</div>
-                <div id="rep-val-mttr" class="text-xl font-extrabold text-slate-900 mt-0.5">0.00 Jam</div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[10px] font-bold text-slate-500">MTTR (AVG REPAIR TIME)</div>
+                <div id="rep-val-mttr" class="text-lg font-extrabold text-slate-900 mt-0.5">0.00 Jam</div>
                 <div id="rep-sub-mttr" class="text-[10px] font-semibold text-slate-600 mt-0.5">Target &le; 4.0 Jam</div>
               </div>
-              <div class="p-3 rounded-lg border border-slate-300 bg-slate-50/50">
-                <div class="text-[10px] font-bold text-slate-500 uppercase">MTBR (Avg Between BD)</div>
-                <div id="rep-val-mtbr" class="text-xl font-extrabold text-slate-900 mt-0.5">0.00 Jam</div>
+              <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                <div class="text-[10px] font-bold text-slate-500">MTBR (AVG BETWEEN BD)</div>
+                <div id="rep-val-mtbr" class="text-lg font-extrabold text-slate-900 mt-0.5">0.00 Jam</div>
                 <div id="rep-sub-mtbr" class="text-[10px] font-semibold text-slate-600 mt-0.5">Target &ge; 40.0 Jam</div>
               </div>
             </div>
 
-            <!-- Distribusi Total Jam Kalender -->
-            <div class="p-3 rounded-lg border border-slate-300 space-y-2">
-              <div class="flex items-center justify-between text-xs">
-                <span class="font-bold text-slate-800 uppercase text-[11px]">1.1 Distribusi Alokasi Waktu Armada (Time Distribution)</span>
-                <span id="rep-total-cal" class="font-extrabold text-slate-900">Total Calendar: 0.0 Jam (100%)</span>
+            <!-- 1.1 Time Allocation -->
+            <div class="space-y-2">
+              <div class="flex justify-between text-xs font-bold text-slate-800">
+                <span>1.1 Distribusi Alokasi Waktu Armada</span>
+                <span id="rep-total-cal">Total Calendar: 0.0 Jam (100%)</span>
               </div>
-              <div id="rep-time-bar" class="w-full h-5 bg-slate-100 rounded overflow-hidden flex text-[10px] font-bold text-white"></div>
-              <div class="grid grid-cols-5 gap-2 text-[10px]">
-                <div><span class="inline-block w-2 h-2 bg-emerald-500 mr-1"></span>Working (WH): <strong id="rep-leg-wh">0j (0%)</strong></div>
-                <div><span class="inline-block w-2 h-2 bg-rose-500 mr-1"></span>BD Unsched: <strong id="rep-leg-bd-unsch">0j (0%)</strong></div>
-                <div><span class="inline-block w-2 h-2 bg-amber-400 mr-1"></span>BD Sched: <strong id="rep-leg-bd-sch">0j (0%)</strong></div>
-                <div><span class="inline-block w-2 h-2 bg-sky-500 mr-1"></span>Rain: <strong id="rep-leg-rain">0j (0%)</strong></div>
-                <div><span class="inline-block w-2 h-2 bg-slate-400 mr-1"></span>Standby: <strong id="rep-leg-stby">0j (0%)</strong></div>
-              </div>
-
-              <!-- Tabel Rincian Alokasi Jam Kalender (Khusus Mode Bulanan Manajemen Detail) -->
-              <div id="rep-monthly-time-table-wrap" class="pt-2">
-                <table class="w-full text-left border-collapse text-[11px] border border-slate-200">
-                  <thead>
-                    <tr class="bg-slate-100 border-b border-slate-300 text-[10px] uppercase text-slate-600">
-                      <th class="px-2.5 py-1.5">Kategori Alokasi Waktu Kalender</th>
-                      <th class="px-2.5 py-1.5 text-right">Total Jam Aktual</th>
-                      <th class="px-2.5 py-1.5 text-right">Proporsi (%)</th>
-                      <th class="px-2.5 py-1.5">Keterangan Faktor Operasional / Teknis</th>
-                    </tr>
-                  </thead>
-                  <tbody id="rep-tbody-time-detail"></tbody>
-                </table>
+              <div id="rep-time-bar" class="w-full h-6 rounded-lg overflow-hidden flex text-[10px] font-bold text-white bg-slate-100"></div>
+              <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                <div><span class="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-xs mr-1.5"></span>WH: <strong id="rep-leg-wh">0j</strong></div>
+                <div><span class="inline-block w-2.5 h-2.5 bg-rose-500 rounded-xs mr-1.5"></span>BD Unsch: <strong id="rep-leg-bd-unsch">0j</strong></div>
+                <div><span class="inline-block w-2.5 h-2.5 bg-amber-400 rounded-xs mr-1.5"></span>BD Sch: <strong id="rep-leg-bd-sch">0j</strong></div>
+                <div><span class="inline-block w-2.5 h-2.5 bg-sky-500 rounded-xs mr-1.5"></span>Rain: <strong id="rep-leg-rain">0j</strong></div>
+                <div><span class="inline-block w-2.5 h-2.5 bg-slate-400 rounded-xs mr-1.5"></span>Standby: <strong id="rep-leg-stby">0j</strong></div>
               </div>
             </div>
 
-            <!-- Narasi Executive Summary -->
-            <div class="p-3.5 rounded-lg border-l-4 border-l-blue-700 bg-blue-50/40 border border-blue-200 space-y-1.5">
+            <!-- Monthly Time Allocation Detail Table -->
+            <div id="rep-monthly-time-table-wrap" class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr class="bg-slate-800 text-white">
+                    <th class="px-2.5 py-1.5">Kategori Alokasi Waktu Kalender</th>
+                    <th class="px-2.5 py-1.5 text-right">Total Jam Aktual</th>
+                    <th class="px-2.5 py-1.5 text-right">Proporsi (%)</th>
+                    <th class="px-2.5 py-1.5">Keterangan Faktor Operasional / Teknis</th>
+                  </tr>
+                </thead>
+                <tbody id="rep-tbody-time-detail"></tbody>
+              </table>
+            </div>
+
+            <!-- 1.2 Executive Summary -->
+            <div class="p-4 rounded-xl bg-blue-50/80 border border-blue-200 space-y-1">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-extrabold text-blue-900 uppercase">1.2 Ulasan Eksekutif (Executive Summary)</span>
-                <span id="rep-summary-source-tag" class="text-[10px] font-bold text-blue-700 uppercase">Analisa Otomatis Reliabilitas</span>
+                <span class="text-xs font-extrabold text-blue-950">1.2 Ulasan Eksekutif (Executive Summary)</span>
+                <span id="rep-summary-source-tag" class="px-2 py-0.5 text-[10px] font-bold bg-blue-200 text-blue-900 rounded">Analisa Otomatis Reliabilitas</span>
               </div>
-              <p id="rep-summary-text" class="text-xs leading-relaxed text-slate-800">
-                Memuat ringkasan analisa performa armada...
-              </p>
+              <p id="rep-summary-text" class="text-xs leading-relaxed text-slate-800"></p>
             </div>
           </div>
 
-          <!-- BAB II: ANALISIS TREN & AKAR MASALAH -->
-          <div class="space-y-3">
-            <h3 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1">
-              BAB II. ANALISIS TREN PERFORMA &amp; PARETO KERUSAKAN KOMPONEN
-            </h3>
-
-            <div class="grid grid-cols-3 gap-4">
-              <div class="col-span-2 p-3 rounded-lg border border-slate-300">
-                <div class="text-[11px] font-bold text-slate-800 uppercase mb-2">Gambar 2.1 Tren Harian PA, MA &amp; UA (%) vs Target 85%</div>
-                <div class="h-44">
-                  <canvas id="rep-chart-trend"></canvas>
-                </div>
+          <!-- BAB II -->
+          <div class="space-y-4">
+            <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-300 pb-1">BAB II. ANALISIS TREN PERFORMA &amp; PARETO KERUSAKAN KOMPONEN</h3>
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+              <div class="lg:col-span-7 border border-slate-200 rounded-xl p-3">
+                <div class="text-xs font-bold text-slate-700 mb-2">Gambar 2.1 Tren Harian PA, MA &amp; UA (%) vs Target 85%</div>
+                <div class="h-56"><canvas id="rep-chart-trend"></canvas></div>
               </div>
-              <div class="p-3 rounded-lg border border-slate-300">
-                <div class="text-[11px] font-bold text-slate-800 uppercase mb-2">Gambar 2.2 Top Komponen Breakdown (Jam)</div>
-                <div class="h-44">
-                  <canvas id="rep-chart-pareto"></canvas>
-                </div>
+              <div class="lg:col-span-5 border border-slate-200 rounded-xl p-3">
+                <div class="text-xs font-bold text-slate-700 mb-2">Gambar 2.2 Top Komponen Breakdown (Jam)</div>
+                <div class="h-56"><canvas id="rep-chart-pareto"></canvas></div>
               </div>
             </div>
 
-            <!-- Tabel Rincian Pareto Komponen (Khusus Mode Bulanan Manajemen Detail) -->
-            <div id="rep-monthly-pareto-wrap" class="border border-slate-300 rounded-lg overflow-hidden">
-              <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-300">
-                <span class="text-[11px] font-extrabold text-slate-800 uppercase">Tabel 2.1 Rincian Kontribusi Kerusakan Per Kelompok Komponen (Detail Bulanan)</span>
-              </div>
-              <table class="w-full text-left border-collapse text-[11px]">
+            <div id="rep-monthly-pareto-wrap" class="overflow-x-auto">
+              <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr class="bg-slate-50 border-b border-slate-300 text-[10px] uppercase text-slate-600">
+                  <tr class="bg-slate-800 text-white">
                     <th class="px-2.5 py-1.5 w-14">Rank</th>
                     <th class="px-2.5 py-1.5">Kelompok Komponen</th>
                     <th class="px-2.5 py-1.5 text-right">Total Jam BD Unscheduled</th>
@@ -1461,82 +1261,109 @@
               </table>
             </div>
 
-            <!-- Penjelasan AI BAB II (Khusus Mode Bulanan Manajemen Detail) -->
-            <div id="rep-monthly-bab2-box" class="p-3.5 rounded-lg border-l-4 border-l-indigo-600 bg-indigo-50/40 border border-indigo-200 space-y-1">
-              <div class="text-[11px] font-extrabold text-indigo-950 uppercase">2.2 Interpretasi Tren Harian &amp; Analisis Pareto (Hukum 80/20)</div>
-              <p id="rep-bab2-text" class="text-xs leading-relaxed text-slate-800">Memuat interpretasi analisis Pareto...</p>
+            <div id="rep-monthly-bab2-box" class="p-4 rounded-xl bg-indigo-50/80 border border-indigo-200 space-y-1">
+              <div class="text-xs font-extrabold text-indigo-950">2.2 Interpretasi Tren Harian &amp; Analisis Pareto (Hukum 80/20)</div>
+              <p id="rep-bab2-text" class="text-xs leading-relaxed text-slate-800"></p>
             </div>
           </div>
 
-          <!-- BAB III: EVALUASI PERFORMA ARMADA & STATUS BREAKDOWN -->
+          <!-- BAB III -->
           <div class="space-y-4">
-            <h3 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1">
-              BAB III. EVALUASI PERFORMA ARMADA &amp; STATUS BREAKDOWN AKTIF
-            </h3>
+            <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-300 pb-1">BAB III. EVALUASI PERFORMA ARMADA &amp; STATUS BREAKDOWN AKTIF</h3>
 
-            <!-- Penjelasan AI BAB III (Khusus Mode Bulanan Manajemen Detail) -->
-            <div id="rep-monthly-bab3-box" class="p-3.5 rounded-lg border-l-4 border-l-emerald-600 bg-emerald-50/40 border border-emerald-200 space-y-1">
-              <div class="text-[11px] font-extrabold text-emerald-950 uppercase">3.0 Ringkasan Evaluasi Perbandingan Model, Unit Prioritas &amp; Stabilitas Populasi</div>
-              <p id="rep-bab3-text" class="text-xs leading-relaxed text-slate-800">Memuat evaluasi perbandingan performa armada...</p>
+            <div id="rep-monthly-bab3-box" class="p-4 rounded-xl bg-emerald-50/80 border border-emerald-200 space-y-1">
+              <div class="text-xs font-extrabold text-emerald-950">3.0 Ringkasan Evaluasi Perbandingan Model, Unit Prioritas &amp; Stabilitas Populasi</div>
+              <p id="rep-bab3-text" class="text-xs leading-relaxed text-slate-800"></p>
             </div>
 
-            <!-- 3.1 Unit Masih Status Breakdown -->
-            <div class="border border-slate-300 rounded-lg overflow-hidden">
-              <div class="px-3 py-1.5 bg-rose-50 border-b border-slate-300 flex items-center justify-between">
-                <span class="text-[11px] font-extrabold text-rose-900 uppercase">3.1 Status Unit Masih Breakdown (Belum RFU / Open Backlog)</span>
-                <span id="rep-active-bd-badge" class="text-[11px] font-bold text-rose-700">0 Unit Down</span>
+            <!-- 3.1 Active Breakdown -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-extrabold text-rose-800">3.1 Status Unit Masih Breakdown / Belum RFU</span>
+                <span id="rep-active-bd-badge" class="px-2 py-0.5 text-[10px] font-bold bg-rose-100 text-rose-800 rounded">0 Unit Down</span>
               </div>
-              <table class="w-full text-left border-collapse text-[11px]">
-                <thead>
-                  <tr class="bg-slate-100 border-b border-slate-300 text-[10px] uppercase text-slate-600">
-                    <th class="px-2.5 py-1.5">Unit ID</th>
-                    <th class="px-2.5 py-1.5">Model</th>
-                    <th class="px-2.5 py-1.5">Waktu Masuk BD</th>
-                    <th class="px-2.5 py-1.5">Durasi Down</th>
-                    <th class="px-2.5 py-1.5">Code</th>
-                    <th class="px-2.5 py-1.5">Lokasi</th>
-                    <th class="px-2.5 py-1.5">Keterangan Kerusakan (Problem)</th>
-                  </tr>
-                </thead>
-                <tbody id="rep-tbody-active-bd"></tbody>
-              </table>
-            </div>
-
-            <!-- 3.2 Rekapitulasi Per Model -->
-            <div class="border border-slate-300 rounded-lg overflow-hidden">
-              <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-300">
-                <span class="text-[11px] font-extrabold text-slate-800 uppercase">3.2 Rekapitulasi Performa Per Model Armada</span>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-rose-800 text-white">
+                      <th class="px-2.5 py-1.5">Unit ID</th>
+                      <th class="px-2.5 py-1.5">Model</th>
+                      <th class="px-2.5 py-1.5">Waktu Masuk BD</th>
+                      <th class="px-2.5 py-1.5">Durasi Down</th>
+                      <th class="px-2.5 py-1.5">Code</th>
+                      <th class="px-2.5 py-1.5">Lokasi</th>
+                      <th class="px-2.5 py-1.5">Keterangan Kerusakan (Problem)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-tbody-active-bd"></tbody>
+                </table>
               </div>
-              <table class="w-full text-left border-collapse text-[11px]">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-300 text-[10px] uppercase text-slate-600">
-                    <th class="px-2.5 py-1.5">Model Unit</th>
-                    <th class="px-2.5 py-1.5 text-right">WH (Jam)</th>
-                    <th class="px-2.5 py-1.5 text-right">BD Unsch</th>
-                    <th class="px-2.5 py-1.5 text-right">BD Sch</th>
-                    <th class="px-2.5 py-1.5 text-right">Standby</th>
-                    <th class="px-2.5 py-1.5 text-right">PA (%)</th>
-                    <th class="px-2.5 py-1.5 text-right">MA (%)</th>
-                    <th class="px-2.5 py-1.5 text-right">UA (%)</th>
-                    <th class="px-2.5 py-1.5 text-right">MTTR</th>
-                    <th class="px-2.5 py-1.5 text-right">MTBR</th>
-                  </tr>
-                </thead>
-                <tbody id="rep-tbody-model"></tbody>
-                <tfoot id="rep-tfoot-model" class="bg-slate-900 text-white font-bold"></tfoot>
-              </table>
             </div>
 
-            <!-- Log Performa Harian Armada (Khusus Mode Bulanan Manajemen Detail) -->
-            <div id="rep-monthly-daily-wrap" class="border border-slate-300 rounded-lg overflow-hidden">
-              <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
-                <span class="text-[11px] font-extrabold text-slate-800 uppercase">Log Performa Harian Armada (Rincian Per Tanggal)</span>
-                <span id="rep-daily-log-badge" class="text-[10px] font-bold text-slate-600">0 Hari</span>
+            <!-- 3.2 Model Summary -->
+            <div class="space-y-1.5">
+              <div class="text-xs font-extrabold text-slate-800">3.2 Rekapitulasi Performa Per Model Armada</div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-slate-800 text-white">
+                      <th class="px-2.5 py-1.5">Model Unit</th>
+                      <th class="px-2.5 py-1.5 text-right">WH (Jam)</th>
+                      <th class="px-2.5 py-1.5 text-right">BD Unsch</th>
+                      <th class="px-2.5 py-1.5 text-right">BD Sch</th>
+                      <th class="px-2.5 py-1.5 text-right">Standby</th>
+                      <th class="px-2.5 py-1.5 text-right">PA (%)</th>
+                      <th class="px-2.5 py-1.5 text-right">MA (%)</th>
+                      <th class="px-2.5 py-1.5 text-right">UA (%)</th>
+                      <th class="px-2.5 py-1.5 text-right">MTTR</th>
+                      <th class="px-2.5 py-1.5 text-right">MTBR</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-tbody-model"></tbody>
+                  <tfoot id="rep-tfoot-model" class="bg-slate-900 text-white font-bold"></tfoot>
+                </table>
+              </div>
+            </div>
+
+            <!-- 3.3 Unit Audit / Watchlist -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span id="rep-unit-section-title" class="text-xs font-extrabold text-slate-800">3.3 Rincian Lengkap Performa Seluruh Unit</span>
+                <span id="rep-unit-section-badge" class="px-2 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700 rounded">0 Unit</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-slate-800 text-white">
+                      <th class="px-2.5 py-1.5">Unit ID</th>
+                      <th class="px-2.5 py-1.5">Model</th>
+                      <th class="px-2.5 py-1.5 text-right">WH</th>
+                      <th class="px-2.5 py-1.5 text-right">BD Unsch</th>
+                      <th class="px-2.5 py-1.5 text-right">BD Sch</th>
+                      <th class="px-2.5 py-1.5 text-right">Standby</th>
+                      <th class="px-2.5 py-1.5 text-right">PA (%)</th>
+                      <th class="px-2.5 py-1.5 text-right">MA (%)</th>
+                      <th class="px-2.5 py-1.5 text-right">UA (%)</th>
+                      <th class="px-2.5 py-1.5 text-right">MTTR</th>
+                      <th class="px-2.5 py-1.5 text-right">MTBR</th>
+                      <th class="px-2.5 py-1.5 text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-tbody-unit"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 3.4 Monthly Daily Log -->
+            <div id="rep-monthly-daily-wrap" class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-extrabold text-slate-800">3.4 Log Performa Harian Armada (Evaluasi Harian Periode)</span>
+                <span id="rep-daily-log-badge" class="px-2 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700 rounded">0 Hari</span>
               </div>
               <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse text-[11px]">
                   <thead>
-                    <tr class="bg-slate-50 border-b border-slate-300 text-[10px] uppercase text-slate-600">
+                    <tr class="bg-slate-800 text-white">
                       <th class="px-2 py-1.5">Tanggal</th>
                       <th class="px-2 py-1.5">Hari</th>
                       <th class="px-2 py-1.5 text-right">Unit</th>
@@ -1559,136 +1386,82 @@
               </div>
             </div>
 
-            <!-- 3.3 Rincian Per Unit -->
-            <div class="border border-slate-300 rounded-lg overflow-hidden">
-              <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
-                <span id="rep-unit-section-title" class="text-[11px] font-extrabold text-slate-800 uppercase">
-                  3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan Manajemen)
-                </span>
-                <span id="rep-unit-section-badge" class="text-[10px] font-bold text-slate-600">-</span>
+            <!-- 3.5 Roster Mutations -->
+            <div id="rep-mutation-section" class="space-y-1.5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-extrabold text-amber-900">3.5 Catatan Mutasi Status Armada / On-Hired &harr; Off-Hired Audit Log</span>
+                <span id="rep-mutation-badge" class="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-900 rounded">0 Mutasi</span>
               </div>
-              <table class="w-full text-left border-collapse text-[11px]">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-300 text-[10px] uppercase text-slate-600">
-                    <th class="px-2.5 py-1.5">Unit ID</th>
-                    <th class="px-2.5 py-1.5">Model</th>
-                    <th class="px-2.5 py-1.5 text-right">WH (Jam)</th>
-                    <th class="px-2.5 py-1.5 text-right">BD Unsch</th>
-                    <th class="px-2.5 py-1.5 text-right">BD Sch</th>
-                    <th class="px-2.5 py-1.5 text-right">Standby</th>
-                    <th class="px-2.5 py-1.5 text-right">PA (%)</th>
-                    <th class="px-2.5 py-1.5 text-right">MA (%)</th>
-                    <th class="px-2.5 py-1.5 text-right">UA (%)</th>
-                    <th class="px-2.5 py-1.5 text-right">MTTR</th>
-                    <th class="px-2.5 py-1.5 text-right">MTBR</th>
-                    <th class="px-2.5 py-1.5 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody id="rep-tbody-unit"></tbody>
-              </table>
-            </div>
-
-            <!-- 3.4 Catatan Mutasi Status Armada (Transparansi Audit Manajemen) -->
-            <div id="rep-mutation-section" class="border border-slate-300 rounded-lg overflow-hidden">
-              <div class="px-3 py-1.5 bg-amber-50 border-b border-slate-300 flex items-center justify-between">
-                <span class="text-[11px] font-extrabold text-amber-900 uppercase">3.4 Catatan Mutasi Status Armada (On-Hired &harr; Off-Hired Audit Log)</span>
-                <span id="rep-mutation-badge" class="text-[10px] font-bold text-amber-800">0 Mutasi</span>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr class="bg-amber-800 text-white">
+                      <th class="px-2.5 py-1.5">Waktu</th>
+                      <th class="px-2.5 py-1.5">Unit ID</th>
+                      <th class="px-2.5 py-1.5">Jenis Mutasi</th>
+                      <th class="px-2.5 py-1.5">Oleh</th>
+                      <th class="px-2.5 py-1.5">Keterangan Teknis &amp; Unit Pengganti</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbody-rep-mutations"></tbody>
+                </table>
               </div>
-              <table class="w-full text-left border-collapse text-[11px]">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-300 text-[10px] uppercase text-slate-600">
-                    <th class="px-2.5 py-1.5">Waktu</th>
-                    <th class="px-2.5 py-1.5">Unit ID</th>
-                    <th class="px-2.5 py-1.5">Jenis Mutasi</th>
-                    <th class="px-2.5 py-1.5">Oleh</th>
-                    <th class="px-2.5 py-1.5">Keterangan Teknis &amp; Unit Pengganti</th>
-                  </tr>
-                </thead>
-                <tbody id="tbody-rep-mutations"></tbody>
-              </table>
             </div>
           </div>
 
-          <!-- BAB IV: REKOMENDASI TINDAK LANJUT & LEMBAR PENGESAHAN -->
+          <!-- BAB IV -->
           <div class="space-y-4">
-            <h3 class="text-xs font-extrabold text-slate-900 uppercase tracking-wider border-b border-slate-300 pb-1">
-              BAB IV. KESIMPULAN, REKOMENDASI TINDAK LANJUT &amp; PENGESAHAN
-            </h3>
+            <h3 class="text-sm font-extrabold text-slate-900 border-b border-slate-300 pb-1">BAB IV. KESIMPULAN, REKOMENDASI TINDAK LANJUT &amp; PENGESAHAN</h3>
 
-            <!-- Kesimpulan Manajemen BAB IV (Khusus Mode Bulanan Manajemen Detail) -->
-            <div id="rep-monthly-bab4-box" class="p-3.5 rounded-lg border-l-4 border-l-slate-800 bg-slate-100/80 border border-slate-300 space-y-1">
-              <div class="text-[11px] font-extrabold text-slate-900 uppercase">4.1 Kesimpulan Evaluasi Bulanan Manajemen</div>
-              <p id="rep-bab4-text" class="text-xs leading-relaxed text-slate-800">Memuat kesimpulan bulanan manajemen...</p>
+            <div id="rep-monthly-bab4-box" class="p-4 rounded-xl bg-slate-100 border border-slate-300 space-y-1">
+              <div class="text-xs font-extrabold text-slate-900">4.1 Kesimpulan Evaluasi Bulanan Manajemen</div>
+              <p id="rep-bab4-text" class="text-xs leading-relaxed text-slate-800"></p>
             </div>
 
-            <div class="p-3.5 rounded-lg bg-slate-50 border border-slate-300 space-y-2">
-              <div id="rep-action-plan-title" class="text-[11px] font-extrabold text-slate-800 uppercase">4.2 Rencana Tindak Lanjut Teknis (Action Plan):</div>
-              <ul id="rep-recommendations-list" class="list-disc list-inside text-xs text-slate-700 space-y-1"></ul>
-              <div id="rep-notes-box" class="hidden pt-2 border-t border-slate-200 text-xs text-slate-800">
-                <strong>Catatan Lapangan Khusus:</strong> <span id="rep-notes-text"></span>
-              </div>
+            <div class="space-y-1.5">
+              <div id="rep-action-plan-title" class="text-xs font-extrabold text-slate-900">4.2 Rencana Tindak Lanjut Teknis (Action Plan):</div>
+              <ol id="rep-recommendations-list" class="list-decimal list-inside text-xs text-slate-800 space-y-1 pl-1"></ol>
             </div>
 
-            <!-- 3 Kolom Pengesahan (Tanda Tangan) -->
-            <div class="grid grid-cols-3 gap-8 pt-4 text-center text-xs">
-              <div class="space-y-14">
-                <div class="font-bold text-slate-800">Dibuat Oleh <span class="italic font-normal text-slate-500">(Prepared by)</span>,</div>
-                <div class="border-t border-slate-800 pt-1.5 mx-6">
-                  <div class="font-bold text-slate-900">Planner / Admin Plant</div>
-                  <div class="text-[10px] text-slate-500">Plant Department</div>
-                </div>
-              </div>
-
-              <div class="space-y-14">
-                <div class="font-bold text-slate-800">Diperiksa Oleh <span class="italic font-normal text-slate-500">(Checked by)</span>,</div>
-                <div class="border-t border-slate-800 pt-1.5 mx-6">
-                  <div class="font-bold text-slate-900">Chief Mechanic</div>
-                  <div class="text-[10px] text-slate-500">Workshop &amp; Field Maintenance</div>
-                </div>
-              </div>
-
-              <div class="space-y-14">
-                <div class="font-bold text-slate-800">Diperiksa Oleh <span class="italic font-normal text-slate-500">(Checked by)</span>,</div>
-                <div class="border-t border-slate-800 pt-1.5 mx-6">
-                  <div class="font-bold text-slate-900">Maintenance Planner Spv</div>
-                  <div class="text-[10px] text-slate-500">Plant Reliability &amp; Planning</div>
-                </div>
-              </div>
+            <div id="rep-notes-box" class="hidden p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">
+              <strong>Catatan Lapangan Khusus:</strong> <span id="rep-notes-text"></span>
             </div>
 
-            <!-- Footer Kredit Sistem Digital Workshop -->
-            <div class="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
+            <!-- 3 Signature Columns -->
+            <div class="grid grid-cols-3 gap-6 pt-8 text-center text-xs">
               <div>
-                Generated automatically by <strong class="text-slate-700">Machine Performance System (MPS)</strong> &mdash; Digital Fleet Reliability &amp; KPI Intelligence developed at <strong class="text-slate-700">PT. KTC Coal Mining &amp; Energy Workshop</strong> by <strong class="text-slate-700">Adi Pranata</strong>.
+                <div class="font-bold text-slate-700">Dibuat Oleh (Prepared by),</div>
+                <div class="h-16 border-b border-slate-400 w-44 mx-auto"></div>
+                <div class="font-extrabold text-slate-900 mt-1.5">Planner / Admin Plant</div>
+                <div class="text-[11px] text-slate-500">Plant Department</div>
               </div>
-              <div class="font-semibold text-slate-600">
-                CONFIDENTIAL &bull; INTERNAL MANAGEMENT REPORT
+              <div>
+                <div class="font-bold text-slate-700">Diperiksa Oleh (Checked by),</div>
+                <div class="h-16 border-b border-slate-400 w-44 mx-auto"></div>
+                <div class="font-extrabold text-slate-900 mt-1.5">Chief Mechanic</div>
+                <div class="text-[11px] text-slate-500">Workshop &amp; Field Maintenance</div>
               </div>
+              <div>
+                <div class="font-bold text-slate-700">Diperiksa Oleh (Checked by),</div>
+                <div class="h-16 border-b border-slate-400 w-44 mx-auto"></div>
+                <div class="font-extrabold text-slate-900 mt-1.5">Maintenance Planner Spv</div>
+                <div class="text-[11px] text-slate-500">Plant Reliability &amp; Planning</div>
+              </div>
+            </div>
+
+            <!-- Official Workshop System Footer -->
+            <div class="pt-4 border-t border-slate-200 text-[10px] text-slate-400 text-center">
+              Generated by Machine Performance System (MPS) &mdash; Digital Fleet Reliability &amp; KPI Intelligence developed at PT. KTC Coal Mining &amp; Energy Workshop by Adi Pranata.
             </div>
           </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- Application Footer (Uniform Wide Layout: max-w-[1600px]) -->
-    <footer id="app-footer" class="bg-white border-t border-slate-200 mt-auto">
-      <div class="max-w-[1600px] mx-auto px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
-        <div>
-          <strong class="text-slate-700">Machine Performance System</strong> &bull; PT. KTC Coal Mining &amp; Energy
-        </div>
-        <div class="text-center sm:text-right">
-          System Architect &amp; Designed by:
-          <a href="https://www.linkedin.com/in/adi-pranata-86449658/" target="_blank" rel="noopener noreferrer"
-            class="text-blue-600 hover:text-blue-800 font-bold underline">
-            Adi Pranata
-          </a>
-          &bull; &copy; 2026 All Rights Reserved (Protected under Law No. 28 of 2014 on Copyright).
         </div>
       </div>
-    </footer>
+
+    </main>
   </div>
 
-  <!-- External Application Logic Bundle (with version tag to bypass stale browser cache) -->
-  <script src="app.js?v=9"></script>
+  <!-- External Application Logic Bundle (Split into Core + Report/PDF Module) -->
+  <script src="app.js?v=10"></script>
+  <script src="report-pdf.js?v=10"></script>
 </body>
 </html>
