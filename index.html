@@ -1320,6 +1320,21 @@
                 <div><span class="inline-block w-2 h-2 bg-sky-500 mr-1"></span>Rain: <strong id="rep-leg-rain">0j (0%)</strong></div>
                 <div><span class="inline-block w-2 h-2 bg-slate-400 mr-1"></span>Standby: <strong id="rep-leg-stby">0j (0%)</strong></div>
               </div>
+
+              <!-- Tabel Rincian Alokasi Jam Kalender (Khusus Mode Bulanan Manajemen Detail) -->
+              <div id="rep-monthly-time-table-wrap" class="pt-2">
+                <table class="w-full text-left border-collapse text-[11px] border border-slate-200">
+                  <thead>
+                    <tr class="bg-slate-100 border-b border-slate-300 text-[10px] uppercase text-slate-600">
+                      <th class="px-2.5 py-1.5">Kategori Alokasi Waktu Kalender</th>
+                      <th class="px-2.5 py-1.5 text-right">Total Jam Aktual</th>
+                      <th class="px-2.5 py-1.5 text-right">Proporsi (%)</th>
+                      <th class="px-2.5 py-1.5">Keterangan Faktor Operasional / Teknis</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-tbody-time-detail"></tbody>
+                </table>
+              </div>
             </div>
 
             <!-- Narasi Executive Summary -->
@@ -1425,6 +1440,36 @@
                 </thead>
                 <tbody id="rep-tbody-model"></tbody>
               </table>
+            </div>
+
+            <!-- Log Performa Harian Armada (Khusus Mode Bulanan Manajemen Detail) -->
+            <div id="rep-monthly-daily-wrap" class="border border-slate-300 rounded-lg overflow-hidden">
+              <div class="px-3 py-1.5 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
+                <span class="text-[11px] font-extrabold text-slate-800 uppercase">Log Performa Harian Armada (Rincian Per Tanggal)</span>
+                <span id="rep-daily-log-badge" class="text-[10px] font-bold text-slate-600">0 Hari</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-[11px]">
+                  <thead>
+                    <tr class="bg-slate-50 border-b border-slate-300 text-[10px] uppercase text-slate-600">
+                      <th class="px-2 py-1.5">Tanggal</th>
+                      <th class="px-2 py-1.5">Hari</th>
+                      <th class="px-2 py-1.5 text-right">Unit</th>
+                      <th class="px-2 py-1.5 text-right">Cal Hrs</th>
+                      <th class="px-2 py-1.5 text-right">WH</th>
+                      <th class="px-2 py-1.5 text-right">BD Unsch</th>
+                      <th class="px-2 py-1.5 text-right">BD Sch</th>
+                      <th class="px-2 py-1.5 text-right">Rain</th>
+                      <th class="px-2 py-1.5 text-right">Standby</th>
+                      <th class="px-2 py-1.5 text-right">PA (%)</th>
+                      <th class="px-2 py-1.5 text-right">MA (%)</th>
+                      <th class="px-2 py-1.5 text-right">UA (%)</th>
+                      <th class="px-2 py-1.5 text-right">MTTR</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rep-tbody-daily-log"></tbody>
+                </table>
+              </div>
             </div>
 
             <!-- 3.3 Rincian Per Unit -->
@@ -1551,6 +1596,6 @@
   </div>
 
   <!-- External Application Logic Bundle (with version tag to bypass stale browser cache) -->
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
