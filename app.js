@@ -111,33 +111,6 @@ function showToast(message, type = 'info') {
 }
 
 /**
- * Universal CSV Download Helper (with UTF-8 BOM for clean Excel opening)
- */
-function downloadCsvFile(filename, headers, rows) {
-  const escapeCell = (val) => {
-    if (val === null || val === undefined) return '""';
-    const str = String(val).replace(/"/g, '""');
-    return `"${str}"`;
-  };
-
-  const csvLines = [headers.map(escapeCell).join(',')];
-  rows.forEach((row) => {
-    csvLines.push(row.map(escapeCell).join(','));
-  });
-
-  const csvContent = '\uFEFF' + csvLines.join('\r\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.setAttribute('download', filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
-
-/**
  * Backend API Request Handler (Zero Storage Disclosure)
  */
 async function callBackendApi(action, payload = {}, customAuth = null) {
@@ -410,11 +383,12 @@ const AuthModule = {
 
     this.applyRolePermissions(session.role);
     await this.loadMasterData(this.currentSite);
+    this.applyRolePermissions(session.role);
     switchAppTab('tab-dashboard');
   },
 
   /**
-   * Role Permissions Matrix:
+   * Role Permissions Matrix (Case-Insensitive):
    * - Superadmin: All tabs (including Unit Population & Executive Report) & all sites
    * - Planner: Monitoring + Operational + Unit Population + Executive Report (locked to assigned Site_Access)
    * - Admin: Monitoring + Daily Operational Input only (NO Unit Population & NO Executive Report)
@@ -1971,12 +1945,16 @@ const InputHmModule = {
         DAY: { isWorking: true, standardHours: this.isFriday ? 9 : 10, rainHours: 0 },
         NIGHT: { isWorking: true, standardHours: 10, rainHours: 0 }
       };
-      this.operations = res.operations || { DAY: [], NIGHT: [] };
+
+      // Keep shift tables blank when date has no saved operational records until Fill Units (W) or Auto-Fill is clicked
+      const rawOps = res.operations || { DAY: [], NIGHT: [] };
+      this.operations = {
+        DAY: (rawOps.DAY || []).filter((r) => String(r.unitId || '').trim() !== ''),
+        NIGHT: (rawOps.NIGHT || []).filter((r) => String(r.unitId || '').trim() !== '')
+      };
 
       this.updateScheduleHeader();
       this.renderMonthlyCalendarStrip();
-
-      // Keep shift tables blank when date has no saved records until Admin clicks Fill Units (W) or Auto-Fill
       this.renderShiftTable('DAY');
       this.renderShiftTable('NIGHT');
       this.updateLiveSummary();
