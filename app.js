@@ -1868,6 +1868,689 @@ const UploadExcelModule = {
 };
 
 /* ============================================================================
+ * 5. DAILY HM INPUT MODULE (DESKTOP KEYBOARD-FIRST GRID)
+ * ============================================================================ */
+const InputHmModule = {
+  selectedDate: '',
+  dayName: '',
+  isFriday: false,
+  shortcutsBound: false,
+  lastHmMap: {},
+  breakdownMap: { DAY: {}, NIGHT: {} },
+  monthlyStatus: {},
+  shifts: {
+    DAY: { isWorking: true, standardHours: 10, rainHours: 0 },
+    NIGHT: { isWorking: true, standardHours: 10, rainHours: 0 }
+  },
+  operations: {
+    DAY: [],
+    NIGHT: []
+  },
+
+  init() {
+    const picker = document.getElementById('op-date-picker');
+    if (picker && !picker.value) {
+      const now = new Date();
+      picker.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    }
+    this.selectedDate = picker ? picker.value : '';
+
+    if (!this.shortcutsBound) {
+      this.shortcutsBound = true;
+      document.addEventListener('keydown', (e) => {
+        if (activeTabId !== 'tab-input-hm') return;
+        if (e.altKey && e.key.toLowerCase() === 'w') {
+          e.preventDefault();
+          this.quickFillBothShifts();
+        } else if (e.altKey && e.key.toLowerCase() === 'd') {
+          e.preventDefault();
+          this.focusFirstInput('DAY');
+        } else if (e.altKey && e.key.toLowerCase() === 'n') {
+          e.preventDefault();
+          this.focusFirstInput('NIGHT');
+        } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+          e.preventDefault();
+          this.saveAll();
+        }
+      });
+    }
+  },
+
+  focusFirstInput(shiftName) {
+    const endEl = document.getElementById(`hm-end-${shiftName}-0`);
+    const unitEl = document.getElementById(`hm-unit-${shiftName}-0`);
+    if (endEl) {
+      endEl.focus();
+      endEl.select();
+    } else if (unitEl) {
+      unitEl.focus();
+    }
+  },
+
+  shiftDateBy(deltaDays) {
+    const picker = document.getElementById('op-date-picker');
+    if (!picker || !picker.value) return;
+    const parts = picker.value.split('-').map(Number);
+    const dt = new Date(parts[0], parts[1] - 1, parts[2] + deltaDays);
+    picker.value = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    this.loadDate();
+  },
+
+  selectCalendarDate(dateYMD) {
+    const picker = document.getElementById('op-date-picker');
+    if (picker) {
+      picker.value = dateYMD;
+      this.loadDate();
+    }
+  },
+
+  async loadDate() {
+    this.init();
+    const picker = document.getElementById('op-date-picker');
+    const dateYMD = picker?.value || this.selectedDate;
+    this.selectedDate = dateYMD;
+    if (!dateYMD) return;
+
+    const statusMsg = document.getElementById('op-status-msg');
+    if (statusMsg) statusMsg.textContent = `Loading operational schedule for ${dateYMD}...`;
+
+    const res = await callBackendApi('GET_DAILY_OPERATION', {
+      site: AuthModule.currentSite,
+      date: dateYMD
+    });
+
+    if (res.status === 'success') {
+      this.dayName = res.dayName || '';
+      this.isFriday = Boolean(res.isFriday);
+      this.lastHmMap = res.lastHmMap || {};
+      this.breakdownMap = res.breakdownMap || { DAY: {}, NIGHT: {} };
+      this.monthlyStatus = res.monthlyStatus || {};
+
+      this.shifts = {
+        DAY: res.shifts?.DAY || { isWorking: true, standardHours: this.isFriday ? 9 : 10, rainHours: 0 },
+        NIGHT: res.shifts?.NIGHT || { isWorking: true, standardHours: 10, rainHours: 0 }
+      };
+
+      // Keep empty when no saved rows exist until user clicks Fill Units (W) or Auto-Fill
+      this.operations = {
+        DAY: (res.operations?.DAY || []).map((r) => ({ ...r })),
+        NIGHT: (res.operations?.NIGHT || []).map((r) => ({ ...r }))
+      };
+
+      this.syncShiftHeaders();
+      this.renderCalendarStrip();
+      this.renderShiftTable('DAY');
+      this.renderShiftTable('NIGHT');
+      this.updateLiveSummary();
+    } else if (statusMsg) {
+      statusMsg.textContent = res.message || 'Failed to load daily operational data.';
+    }
+  },
+
+  syncShiftHeaders() {
+    const friBadge = document.getElementById('op-friday-badge');
+    if (friBadge) {
+      friBadge.textContent = this.isFriday
+        ? 'Friday Schedule: Day 9h + Night 10h = 19h'
+        : 'Standard Schedule: Day 10h + Night 10h = 20h';
+    }
+
+    ['DAY', 'NIGHT'].forEach((sh) => {
+      const lower = sh.toLowerCase();
+      const chk = document.getElementById(`chk-${lower}-working`);
+      const rainEl = document.getElementById(`rain-${lower}-hours`);
+      const maxBadge = document.getElementById(`max-hrs-${lower}`);
+      const panel = document.getElementById(`panel-${lower}-shift`);
+      const quota = sh === 'DAY' && this.isFriday ? 9 : 10;
+
+      if (chk) chk.checked = Boolean(this.shifts[sh].isWorking);
+      if (rainEl) {
+        rainEl.value = this.shifts[sh].rainHours || 0;
+        rainEl.max = quota;
+      }
+      if (maxBadge) maxBadge.textContent = `Quota: ${quota}h`;
+      if (panel) {
+        panel.classList.toggle('opacity-60', !this.shifts[sh].isWorking);
+      }
+    });
+  },
+
+  renderCalendarStrip() {
+    const container = document.getElementById('op-monthly-calendar-strip');
+    if (!container || !this.selectedDate) return;
+
+    const [yStr, mStr] = this.selectedDate.split('-');
+    const year = Number(yStr);
+    const month = Number(mStr);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    const buttons = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dd = String(d).padStart(2, '0');
+      const fullDate = `${yStr}-${mStr}-${dd}`;
+      const st = this.monthlyStatus[fullDate] || 'EMPTY';
+      const isSelected = fullDate === this.selectedDate;
+
+      let colorCls = 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200';
+      if (st === 'COMPLETE') {
+        colorCls = 'bg-emerald-500 text-white border-emerald-600';
+      } else if (st === 'BD_ONLY') {
+        colorCls = 'bg-amber-400 text-slate-900 border-amber-500';
+      }
+      const ringCls = isSelected ? 'ring-2 ring-blue-600 ring-offset-1 font-extrabold' : 'font-semibold';
+
+      buttons.push(
+        `<button type="button" onclick="InputHmModule.selectCalendarDate('${fullDate}')" title="${fullDate} (${st})"
+          class="w-7 h-7 text-[11px] rounded-md border transition ${colorCls} ${ringCls}">
+          ${dd}
+        </button>`
+      );
+    }
+    container.innerHTML = buttons.join('');
+  },
+
+  toggleShiftWorking(shiftName, isWorking) {
+    this.shifts[shiftName].isWorking = Boolean(isWorking);
+    this.shifts[shiftName].standardHours = isWorking
+      ? (shiftName === 'DAY' && this.isFriday ? 9 : 10)
+      : 0;
+    this.syncShiftHeaders();
+    this.renderShiftTable(shiftName);
+    this.updateLiveSummary();
+  },
+
+  updateRainHours(shiftName, val) {
+    const quota = shiftName === 'DAY' && this.isFriday ? 9 : 10;
+    const clean = Math.min(quota, Math.max(0, parseFloat(val) || 0));
+    this.shifts[shiftName].rainHours = clean;
+    this.updateLiveSummary();
+  },
+
+  getExpectedStartHm(shiftName, unitId) {
+    const uid = String(unitId || '').trim();
+    if (!uid) return null;
+
+    if (shiftName === 'NIGHT') {
+      const dayRow = this.operations.DAY.find((r) => String(r.unitId || '').trim() === uid);
+      if (dayRow && dayRow.hmEnd !== '' && !isNaN(parseFloat(dayRow.hmEnd))) {
+        return parseFloat(dayRow.hmEnd);
+      }
+    }
+    return this.lastHmMap[uid] !== undefined ? Number(this.lastHmMap[uid]) : null;
+  },
+
+  quickFillActiveUnits(shiftName, autoFocus = true) {
+    if (!this.shifts[shiftName].isWorking) {
+      this.toggleShiftWorking(shiftName, true);
+    }
+
+    const activeUnits = AuthModule.masterData.units || [];
+    if (activeUnits.length === 0) {
+      showToast(`No active On-Hired units (W/SW) found for site ${AuthModule.currentSite}.`, 'warning');
+      return;
+    }
+
+    const existingMap = {};
+    this.operations[shiftName].forEach((r) => {
+      if (r.unitId) existingMap[String(r.unitId).trim()] = r;
+    });
+
+    this.operations[shiftName] = activeUnits.map((u) => {
+      const prev = existingMap[u.unitId];
+      const expectedStart = this.getExpectedStartHm(shiftName, u.unitId);
+      const hmStart = prev && prev.hmStart !== '' ? prev.hmStart : (expectedStart !== null ? expectedStart : '');
+      const hmEnd = prev && prev.hmEnd !== '' ? prev.hmEnd : '';
+      const wh = hmStart !== '' && hmEnd !== '' && !isNaN(parseFloat(hmEnd))
+        ? Math.max(0, Math.round((parseFloat(hmEnd) - parseFloat(hmStart)) * 100) / 100)
+        : 0;
+
+      return {
+        unitId: u.unitId,
+        model: u.model,
+        hmStart: hmStart,
+        hmEnd: hmEnd,
+        wh: wh,
+        remarks: prev?.remarks || ''
+      };
+    });
+
+    this.renderShiftTable(shiftName);
+    this.updateLiveSummary();
+
+    if (autoFocus) {
+      setTimeout(() => this.focusFirstInput(shiftName), 20);
+    }
+  },
+
+  quickFillBothShifts() {
+    this.quickFillActiveUnits('DAY', false);
+    this.quickFillActiveUnits('NIGHT', false);
+    setTimeout(() => this.focusFirstInput('DAY'), 20);
+    showToast('Populated active On-Hired units for Day & Night shifts.', 'info');
+  },
+
+  addUnitRow(shiftName, autoFocus = false) {
+    if (!this.shifts[shiftName].isWorking) return;
+    const idx = this.operations[shiftName].length;
+    this.operations[shiftName].push({
+      unitId: '',
+      model: '',
+      hmStart: '',
+      hmEnd: '',
+      wh: 0,
+      remarks: ''
+    });
+    this.renderShiftTable(shiftName);
+    this.updateLiveSummary();
+
+    if (autoFocus) {
+      setTimeout(() => {
+        const el = document.getElementById(`hm-unit-${shiftName}-${idx}`);
+        if (el) el.focus();
+      }, 20);
+    }
+  },
+
+  removeUnitRow(shiftName, idx) {
+    this.operations[shiftName].splice(idx, 1);
+    this.renderShiftTable(shiftName);
+    this.updateLiveSummary();
+  },
+
+  onRowChange(shiftName, idx, field, value) {
+    const row = this.operations[shiftName][idx];
+    if (!row) return;
+
+    row[field] = value;
+
+    if (field === 'unitId') {
+      const cleanId = String(value || '').trim();
+      const found = (AuthModule.masterData.units || []).find((u) => u.unitId.toLowerCase() === cleanId.toLowerCase());
+      if (found) {
+        row.unitId = found.unitId;
+        row.model = found.model;
+      } else {
+        row.model = '';
+      }
+
+      const expected = this.getExpectedStartHm(shiftName, row.unitId);
+      row.hmStart = expected !== null ? expected : '';
+      this.renderShiftTable(shiftName);
+      this.updateLiveSummary();
+      return;
+    }
+
+    const start = parseFloat(row.hmStart);
+    const end = parseFloat(row.hmEnd);
+    row.wh = !isNaN(start) && !isNaN(end) ? Math.round((end - start) * 100) / 100 : 0;
+
+    // Auto-propagate Day End HM to Night Start HM for the same unit
+    if (shiftName === 'DAY' && field === 'hmEnd' && row.unitId) {
+      const nightRow = this.operations.NIGHT.find((r) => String(r.unitId || '').trim() === String(row.unitId).trim());
+      if (nightRow && !isNaN(end)) {
+        nightRow.hmStart = end;
+        const nEnd = parseFloat(nightRow.hmEnd);
+        nightRow.wh = !isNaN(nEnd) ? Math.round((nEnd - end) * 100) / 100 : 0;
+        this.renderShiftTable('NIGHT');
+      }
+    }
+
+    this.updateRowVisuals(shiftName, idx);
+    this.updateLiveSummary();
+  },
+
+  handleRowKeydown(event, shiftName, idx, field) {
+    const key = event.key;
+
+    // Shortcut '=' or 'f' on End HM -> Auto-fill full shift minus BD hours
+    if (field === 'hmEnd' && (key === '=' || key.toLowerCase() === 'f')) {
+      event.preventDefault();
+      const row = this.operations[shiftName][idx];
+      if (!row) return;
+
+      const maxQuota = shiftName === 'DAY' && this.isFriday ? 9 : 10;
+      const bdHrs = this.breakdownMap[shiftName]?.[row.unitId]?.hours || 0;
+      const availQuota = Math.max(0, Math.round((maxQuota - bdHrs) * 100) / 100);
+      const startVal = parseFloat(row.hmStart);
+
+      if (!isNaN(startVal)) {
+        const autoEnd = Math.round((startVal + availQuota) * 100) / 100;
+        const endInput = document.getElementById(`hm-end-${shiftName}-${idx}`);
+        if (endInput) endInput.value = autoEnd;
+        this.onRowChange(shiftName, idx, 'hmEnd', String(autoEnd));
+      }
+      this.moveVerticalFocus(shiftName, idx, field, 1);
+      return;
+    }
+
+    if (key === 'Enter' || key === 'ArrowDown') {
+      event.preventDefault();
+      this.moveVerticalFocus(shiftName, idx, field, 1);
+    } else if (key === 'ArrowUp') {
+      event.preventDefault();
+      this.moveVerticalFocus(shiftName, idx, field, -1);
+    }
+  },
+
+  moveVerticalFocus(shiftName, idx, field, dir) {
+    const prefix = field === 'unitId' ? 'hm-unit' : field === 'hmStart' ? 'hm-start' : 'hm-end';
+    const nextIdx = idx + dir;
+    const targetEl = document.getElementById(`${prefix}-${shiftName}-${nextIdx}`);
+
+    if (targetEl) {
+      targetEl.focus();
+      if (targetEl.select) targetEl.select();
+    } else if (dir > 0 && shiftName === 'DAY' && this.operations.NIGHT.length > 0) {
+      const nightFirst = document.getElementById(`${prefix}-NIGHT-0`);
+      if (nightFirst) {
+        nightFirst.focus();
+        if (nightFirst.select) nightFirst.select();
+      }
+    }
+  },
+
+  handleGridPaste(event, shiftName, startIdx, startField) {
+    const clip = event.clipboardData?.getData('text');
+    if (!clip || (!clip.includes('\n') && !clip.includes('\t'))) return;
+
+    event.preventDefault();
+    const lines = clip.replace(/\r/g, '').split('\n').filter((l) => l.trim() !== '');
+    if (lines.length === 0) return;
+
+    lines.forEach((line, offset) => {
+      const rIdx = startIdx + offset;
+      while (this.operations[shiftName].length <= rIdx) {
+        this.operations[shiftName].push({ unitId: '', model: '', hmStart: '', hmEnd: '', wh: 0, remarks: '' });
+      }
+      const cols = line.split('\t').map((c) => c.trim());
+      if (cols.length >= 3) {
+        this.onRowChange(shiftName, rIdx, 'unitId', cols[0]);
+        this.onRowChange(shiftName, rIdx, 'hmStart', cols[1]);
+        this.onRowChange(shiftName, rIdx, 'hmEnd', cols[2]);
+      } else if (cols.length === 2) {
+        this.onRowChange(shiftName, rIdx, 'hmStart', cols[0]);
+        this.onRowChange(shiftName, rIdx, 'hmEnd', cols[1]);
+      } else if (cols.length === 1) {
+        this.onRowChange(shiftName, rIdx, startField, cols[0]);
+      }
+    });
+
+    this.renderShiftTable(shiftName);
+    this.updateLiveSummary();
+    showToast(`Pasted ${lines.length} row(s) into ${shiftName} Shift.`, 'success');
+  },
+
+  buildRowStatusHtml(shiftName, row) {
+    const maxQuota = shiftName === 'DAY' && this.isFriday ? 9 : 10;
+    const expectedStart = this.getExpectedStartHm(shiftName, row.unitId);
+    const bdInfo = row.unitId ? this.breakdownMap[shiftName]?.[row.unitId] : null;
+    const start = parseFloat(row.hmStart);
+    const end = parseFloat(row.hmEnd);
+
+    const badges = [];
+    if (bdInfo && bdInfo.hours > 0) {
+      badges.push(`<span class="px-1.5 py-0.5 bg-rose-100 text-rose-700 font-bold rounded text-[10px]">BD ${bdInfo.hours}h (${bdInfo.codes.join('/')})</span>`);
+    }
+
+    if (!isNaN(start) && expectedStart !== null) {
+      const gap = Math.round((start - expectedStart) * 100) / 100;
+      if (gap < 0) {
+        return `<span class="text-[11px] font-bold text-rose-600">Start (${start}) &lt; Prev (${expectedStart})!</span>`;
+      }
+      if (gap > 24) {
+        return `<span class="text-[11px] font-bold text-rose-600">Jump +${gap}h from Prev (${expectedStart})!</span>`;
+      }
+    }
+
+    if (!isNaN(start) && !isNaN(end)) {
+      const diff = Math.round((end - start) * 100) / 100;
+      if (diff < 0) {
+        return `<span class="text-[11px] font-bold text-rose-600">End HM &lt; Start HM!</span>`;
+      }
+      if (diff > maxQuota) {
+        return `<span class="text-[11px] font-bold text-rose-600">Exceeds ${maxQuota}h quota!</span>`;
+      }
+      const rem = Math.max(0, Math.round((maxQuota - diff - (bdInfo?.hours || 0)) * 100) / 100);
+      badges.push(`<span class="text-[11px] text-slate-500">${rem > 0 ? `Stby ${rem}h` : 'Full'}</span>`);
+    } else if (expectedStart !== null) {
+      badges.push(`<span class="text-[10px] text-blue-600">Prev: ${expectedStart}</span>`);
+    }
+
+    return badges.length > 0 ? badges.join(' ') : '<span class="text-[11px] text-slate-400">-</span>';
+  },
+
+  updateRowVisuals(shiftName, idx) {
+    const row = this.operations[shiftName][idx];
+    if (!row) return;
+    const whCell = document.getElementById(`hm-wh-${shiftName}-${idx}`);
+    const statusCell = document.getElementById(`hm-status-${shiftName}-${idx}`);
+    const maxQuota = shiftName === 'DAY' && this.isFriday ? 9 : 10;
+
+    if (whCell) {
+      const val = Number(row.wh) || 0;
+      whCell.textContent = `${val.toFixed(1)}h`;
+      whCell.className = val < 0 || val > maxQuota
+        ? 'px-2 py-1.5 text-right font-extrabold text-xs text-rose-600'
+        : val > 0
+        ? 'px-2 py-1.5 text-right font-extrabold text-xs text-emerald-700'
+        : 'px-2 py-1.5 text-right font-semibold text-xs text-slate-400';
+    }
+    if (statusCell) {
+      statusCell.innerHTML = this.buildRowStatusHtml(shiftName, row);
+    }
+  },
+
+  renderShiftTable(shiftName) {
+    const tbody = document.getElementById(`tbody-${shiftName.toLowerCase()}-op`);
+    if (!tbody) return;
+
+    const list = this.operations[shiftName];
+    if (list.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="px-4 py-8 text-center text-xs text-slate-400">
+            No units populated yet. Click <strong>"Fill Units (W)"</strong> above or <strong>"Auto-Fill Active Units (Alt+W)"</strong> to start input.
+          </td>
+        </tr>`;
+      return;
+    }
+
+    const maxQuota = shiftName === 'DAY' && this.isFriday ? 9 : 10;
+
+    tbody.innerHTML = list
+      .map((row, idx) => {
+        const whVal = Number(row.wh) || 0;
+        const whCls = whVal < 0 || whVal > maxQuota
+          ? 'text-rose-600 font-extrabold'
+          : whVal > 0
+          ? 'text-emerald-700 font-extrabold'
+          : 'text-slate-400 font-semibold';
+
+        return `
+          <tr class="border-b border-slate-100 hover:bg-slate-50/90 text-xs">
+            <td class="px-2 py-1.5 text-center font-mono text-[11px] text-slate-400">${idx + 1}</td>
+            <td class="px-2 py-1.5">
+              <input type="text" id="hm-unit-${shiftName}-${idx}" list="datalist-active-units"
+                value="${row.unitId || ''}" placeholder="Unit ID..."
+                onchange="InputHmModule.onRowChange('${shiftName}', ${idx}, 'unitId', this.value)"
+                onkeydown="InputHmModule.handleRowKeydown(event, '${shiftName}', ${idx}, 'unitId')"
+                onpaste="InputHmModule.handleGridPaste(event, '${shiftName}', ${idx}, 'unitId')"
+                class="w-full px-2 py-1 text-xs font-bold border border-slate-300 rounded focus:outline-none focus:border-blue-500" />
+              <div class="text-[10px] text-slate-400 truncate mt-0.5">${row.model || '-'}</div>
+            </td>
+            <td class="px-2 py-1.5">
+              <input type="number" id="hm-start-${shiftName}-${idx}" step="0.1"
+                value="${row.hmStart !== '' ? row.hmStart : ''}" placeholder="0.0"
+                oninput="InputHmModule.onRowChange('${shiftName}', ${idx}, 'hmStart', this.value)"
+                onkeydown="InputHmModule.handleRowKeydown(event, '${shiftName}', ${idx}, 'hmStart')"
+                onpaste="InputHmModule.handleGridPaste(event, '${shiftName}', ${idx}, 'hmStart')"
+                class="w-full px-2 py-1 text-xs font-mono text-right border border-slate-300 rounded focus:outline-none focus:border-blue-500" />
+            </td>
+            <td class="px-2 py-1.5">
+              <input type="text" inputmode="decimal" id="hm-end-${shiftName}-${idx}"
+                value="${row.hmEnd !== '' ? row.hmEnd : ''}" placeholder="="
+                oninput="InputHmModule.onRowChange('${shiftName}', ${idx}, 'hmEnd', this.value)"
+                onkeydown="InputHmModule.handleRowKeydown(event, '${shiftName}', ${idx}, 'hmEnd')"
+                onpaste="InputHmModule.handleGridPaste(event, '${shiftName}', ${idx}, 'hmEnd')"
+                class="w-full px-2 py-1 text-xs font-mono font-bold text-right border border-blue-300 bg-blue-50/30 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </td>
+            <td id="hm-wh-${shiftName}-${idx}" class="px-2 py-1.5 text-right text-xs ${whCls}">
+              ${whVal.toFixed(1)}h
+            </td>
+            <td id="hm-status-${shiftName}-${idx}" class="px-2 py-1.5">
+              ${this.buildRowStatusHtml(shiftName, row)}
+            </td>
+            <td class="px-2 py-1.5 text-center">
+              <button type="button" tabindex="-1" onclick="InputHmModule.removeUnitRow('${shiftName}', ${idx})"
+                title="Remove Row" class="text-slate-400 hover:text-rose-600 font-bold px-1.5 py-0.5 rounded">
+                &times;
+              </button>
+            </td>
+          </tr>`;
+      })
+      .join('');
+  },
+
+  updateLiveSummary() {
+    const activeCount = (AuthModule.masterData.units || []).length;
+    const sumWh = (list) => list.reduce((acc, r) => acc + Math.max(0, Number(r.wh) || 0), 0);
+    const dayWh = this.shifts.DAY.isWorking ? sumWh(this.operations.DAY) : 0;
+    const nightWh = this.shifts.NIGHT.isWorking ? sumWh(this.operations.NIGHT) : 0;
+    const totWh = dayWh + nightWh;
+    const rainPop = ((this.shifts.DAY.isWorking ? Number(this.shifts.DAY.rainHours) || 0 : 0) +
+      (this.shifts.NIGHT.isWorking ? Number(this.shifts.NIGHT.rainHours) || 0 : 0)) * activeCount;
+
+    const summaryEl = document.getElementById('op-live-summary');
+    const statusEl = document.getElementById('op-status-msg');
+    if (summaryEl) {
+      summaryEl.textContent = `Active Fleet: ${activeCount} Units | Day WH: ${dayWh.toFixed(1)}h | Night WH: ${nightWh.toFixed(1)}h | Total WH: ${totWh.toFixed(1)}h | Est. Fleet Rain: ${rainPop.toFixed(1)}h`;
+    }
+    if (statusEl && this.selectedDate) {
+      const hasRows = this.operations.DAY.length > 0 || this.operations.NIGHT.length > 0;
+      statusEl.textContent = hasRows
+        ? `Editing ${this.selectedDate} (${this.dayName}). Blank End HM rows are skipped. Press Ctrl+S to save.`
+        : `Date ${this.selectedDate} (${this.dayName}) is empty. Click "Fill Units (W)" or "Auto-Fill Active Units (Alt+W)" to populate fleet.`;
+    }
+  },
+
+  exportCsv() {
+    const allRows = [];
+    ['DAY', 'NIGHT'].forEach((sh) => {
+      (this.operations[sh] || []).forEach((r) => {
+        if (!r.unitId) return;
+        allRows.push([
+          AuthModule.currentSite,
+          this.selectedDate,
+          sh,
+          r.unitId,
+          r.model || '',
+          r.hmStart !== '' ? r.hmStart : '',
+          r.hmEnd !== '' ? r.hmEnd : '',
+          (Number(r.wh) || 0).toFixed(2)
+        ]);
+      });
+    });
+
+    if (allRows.length === 0) {
+      showToast('No HM rows populated to export.', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('btn-hm-export-csv');
+    const headers = ['Site', 'Date', 'Shift', 'Unit_ID', 'Model', 'Start_HM', 'End_HM', 'Working_Hours'];
+    downloadCsvFile(`MPS_Daily_HM_${AuthModule.currentSite}_${this.selectedDate}.csv`, headers, allRows, btn);
+    showToast('Daily HM rows exported to CSV.', 'success');
+  },
+
+  async saveAll() {
+    const btn = document.getElementById('btn-save-op');
+    if (!this.selectedDate) {
+      showToast('Please select an operational date first.', 'warning');
+      return;
+    }
+
+    const filteredOps = { DAY: [], NIGHT: [] };
+
+    for (const sh of ['DAY', 'NIGHT']) {
+      if (!this.shifts[sh].isWorking) continue;
+      const maxQuota = sh === 'DAY' && this.isFriday ? 9 : 10;
+      const seen = {};
+
+      for (const row of this.operations[sh]) {
+        const uid = String(row.unitId || '').trim();
+        const endRaw = String(row.hmEnd ?? '').trim();
+        if (!uid || endRaw === '') continue;
+
+        if (seen[uid]) {
+          showToast(`Duplicate Unit ${uid} detected in ${sh} Shift.`, 'error');
+          return;
+        }
+        seen[uid] = true;
+
+        const start = parseFloat(row.hmStart);
+        const end = parseFloat(endRaw);
+        if (isNaN(start) || isNaN(end) || end < start) {
+          showToast(`Invalid HM values for unit ${uid} (${sh} Shift).`, 'error');
+          return;
+        }
+
+        const expected = this.getExpectedStartHm(sh, uid);
+        if (expected !== null) {
+          const gap = Math.round((start - expected) * 100) / 100;
+          if (gap < 0) {
+            showToast(`Start HM for ${uid} (${start}) cannot be less than previous End HM (${expected}).`, 'error');
+            return;
+          }
+          if (gap > 24) {
+            showToast(`Start HM for ${uid} (${start}) jumps +${gap}h from previous End HM (${expected}).`, 'error');
+            return;
+          }
+        }
+
+        const wh = Math.round((end - start) * 100) / 100;
+        if (wh > maxQuota) {
+          showToast(`WH for ${uid} (${wh}h) exceeds ${sh} Shift quota (${maxQuota}h).`, 'error');
+          return;
+        }
+
+        filteredOps[sh].push({
+          unitId: uid,
+          model: row.model || '',
+          hmStart: start,
+          hmEnd: end,
+          wh: wh,
+          remarks: row.remarks || ''
+        });
+      }
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Saving & Recalculating KPI...';
+    }
+
+    const res = await callBackendApi('SAVE_DAILY_OPERATION', {
+      site: AuthModule.currentSite,
+      date: this.selectedDate,
+      shifts: this.shifts,
+      operations: filteredOps
+    });
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Save Daily Operational Data (Ctrl+S)';
+    }
+
+    if (res.status === 'success') {
+      showToast(res.message, 'success');
+      await this.loadDate();
+    } else {
+      showToast(res.message || 'Failed to save daily operational data.', 'error');
+    }
+  }
+};
+
+/* ============================================================================
  * 6. UNIT POPULATION REGISTRY & MONTHLY FLEET ROSTER LOCK MODULE
  * ============================================================================ */
 const PopulationModule = {
@@ -2394,175 +3077,6 @@ const PopulationModule = {
       await this.loadMonth();
     } else {
       showToast(res.message || 'Failed to save monthly fleet roster.', 'error');
-    }
-  }
-};
-
-/* ============================================================================
- * 6. UNIT POPULATION REGISTRY MODULE
- * ============================================================================ */
-const PopulationModule = {
-  async pullFromMaster() {
-    const btn = document.getElementById('btn-pull-master');
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Syncing...';
-    }
-
-    await AuthModule.loadMasterData(AuthModule.currentSite);
-    this.renderTable();
-
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = 'Sync from Master Data';
-    }
-    showToast(`Synced fleet population for site ${AuthModule.currentSite}.`, 'success');
-  },
-
-  renderTable() {
-    const tbody = document.getElementById('tbody-population-list');
-    const searchVal = String(document.getElementById('pop-search-input')?.value || '').trim().toLowerCase();
-    const statusFilter = document.getElementById('pop-status-filter')?.value || 'ALL';
-    const badge = document.getElementById('pop-total-badge');
-    if (!tbody) return;
-
-    const allUnits = AuthModule.masterData.allSiteUnits || [];
-    const counts = { W: 0, SW: 0, R: 0, S: 0 };
-    allUnits.forEach((u) => {
-      if (counts[u.status] !== undefined) counts[u.status] += 1;
-    });
-
-    document.getElementById('pop-count-w').textContent = counts.W;
-    document.getElementById('pop-count-sw').textContent = counts.SW;
-    document.getElementById('pop-count-r').textContent = counts.R;
-    document.getElementById('pop-count-s').textContent = counts.S;
-
-    const activeTotal = counts.W + counts.SW + counts.R;
-    if (badge) badge.textContent = `${activeTotal} Active / ${allUnits.length} Total (${AuthModule.currentSite})`;
-
-    const filtered = allUnits.filter((u) => {
-      if (statusFilter !== 'ALL' && u.status !== statusFilter) return false;
-      if (searchVal) {
-        return (
-          u.unitId.toLowerCase().includes(searchVal) ||
-          u.model.toLowerCase().includes(searchVal) ||
-          u.brand.toLowerCase().includes(searchVal) ||
-          u.equipment.toLowerCase().includes(searchVal)
-        );
-      }
-      return true;
-    });
-
-    if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-6 text-center text-sm text-slate-400">No units match the current filter.</td></tr>`;
-      return;
-    }
-
-    const statusOptions = [
-      { val: 'W', label: 'W (Working)' },
-      { val: 'SW', label: 'SW (Standby Working)' },
-      { val: 'R', label: 'R (Repair)' },
-      { val: 'S', label: 'S (Scrap / Inactive)' }
-    ];
-
-    tbody.innerHTML = filtered
-      .map((u) => {
-        const isScrap = u.status === 'S';
-        const rowCls = isScrap ? 'bg-slate-50 text-slate-400' : 'hover:bg-slate-50';
-        const selectStyle = {
-          W: 'border-emerald-300 bg-emerald-50 text-emerald-800',
-          SW: 'border-blue-300 bg-blue-50 text-blue-800',
-          R: 'border-amber-300 bg-amber-50 text-amber-800',
-          S: 'border-rose-300 bg-rose-50 text-rose-700'
-        }[u.status] || 'border-slate-300 bg-white';
-
-        const opts = statusOptions
-          .map((o) => `<option value="${o.val}" ${u.status === o.val ? 'selected' : ''}>${o.label}</option>`)
-          .join('');
-
-        return `
-          <tr class="border-b border-slate-100 text-xs ${rowCls}">
-            <td class="px-4 py-2 font-bold ${isScrap ? 'line-through' : 'text-slate-900'}">${u.unitId}</td>
-            <td class="px-4 py-2">${u.category || '-'}</td>
-            <td class="px-4 py-2">${u.equipment || '-'}</td>
-            <td class="px-4 py-2">${u.brand || '-'}</td>
-            <td class="px-4 py-2 font-medium">${u.model}</td>
-            <td class="px-4 py-2">
-              <select data-unit-id="${u.unitId}" data-old-status="${u.status}"
-                onchange="PopulationModule.onInlineStatusChange(this)"
-                class="pop-status-select px-2.5 py-1 text-xs font-semibold rounded border focus:outline-none ${selectStyle}">
-                ${opts}
-              </select>
-            </td>
-          </tr>`;
-      })
-      .join('');
-  },
-
-  onInlineStatusChange(selectEl) {
-    if (selectEl.getAttribute('data-old-status') !== selectEl.value) {
-      selectEl.classList.add('ring-2', 'ring-blue-500');
-    } else {
-      selectEl.classList.remove('ring-2', 'ring-blue-500');
-    }
-  },
-
-  exportCsv() {
-    const allUnits = AuthModule.masterData.allSiteUnits || [];
-    if (allUnits.length === 0) {
-      showToast('No fleet population records to export.', 'warning');
-      return;
-    }
-
-    const btn = document.getElementById('btn-pop-export-csv');
-    const headers = ['Site', 'Unit_ID', 'Category', 'Equipment', 'Brand', 'Model', 'Population_Status'];
-    const rows = allUnits.map((u) => [
-      AuthModule.currentSite, u.unitId, u.category, u.equipment, u.brand, u.model, u.status
-    ]);
-    downloadCsvFile(`MPS_Unit_Population_${AuthModule.currentSite}.csv`, headers, rows, btn);
-    showToast('Fleet population exported to CSV.', 'success');
-  },
-
-  async saveBulkStatus() {
-    const btn = document.getElementById('btn-save-bulk-status');
-    const changes = [];
-
-    document.querySelectorAll('.pop-status-select').forEach((sel) => {
-      const unitId = sel.getAttribute('data-unit-id');
-      const oldStatus = sel.getAttribute('data-old-status');
-      const newStatus = sel.value;
-      if (unitId && oldStatus !== newStatus) {
-        changes.push({ unitId: unitId, status: newStatus });
-      }
-    });
-
-    if (changes.length === 0) {
-      showToast('No status changes detected.', 'warning');
-      return;
-    }
-
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = `Saving (${changes.length})...`;
-    }
-
-    const res = await callBackendApi('MANAGE_UNIT_POPULATION', {
-      mode: 'BULK_UPDATE_STATUS',
-      site: AuthModule.currentSite,
-      changes: changes
-    });
-
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = 'Save Status Changes';
-    }
-
-    if (res.status === 'success') {
-      showToast(res.message, 'success');
-      await AuthModule.loadMasterData(AuthModule.currentSite);
-      this.renderTable();
-    } else {
-      showToast(res.message || 'Failed to update unit status.', 'error');
     }
   }
 };
