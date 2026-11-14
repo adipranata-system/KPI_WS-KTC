@@ -3406,6 +3406,37 @@ const ReportModule = {
     // Render Report Charts
     this.renderReportCharts(target);
 
+    // Monthly Detailed Time Distribution Table (Hidden in Weekly, Shown in Monthly)
+    const timeTableWrap = document.getElementById('rep-monthly-time-table-wrap');
+    const tbodyTimeDetail = document.getElementById('rep-tbody-time-detail');
+    if (isWeekly) {
+      timeTableWrap?.classList.add('hidden');
+    } else {
+      timeTableWrap?.classList.remove('hidden');
+      if (tbodyTimeDetail) {
+        const timeRows = [
+          { cat: 'Working Hours (WH)', hrs: ov.wh, p: pct(ov.wh), desc: 'Jam produktif unit beroperasi di lapangan' },
+          { cat: 'Breakdown Unscheduled (USCH / ACD)', hrs: ov.bdUnsched, p: pct(ov.bdUnsched), desc: `Kerusakan mendadak (${ov.freqUnsched || 0} kejadian) — Faktor Plant` },
+          { cat: 'Breakdown Scheduled (SCH / SVC)', hrs: ov.bdSched, p: pct(ov.bdSched), desc: 'Perawatan berkala & servis terjadwal — Faktor Plant' },
+          { cat: 'Rain & Slippery', hrs: ov.rainHrs, p: pct(ov.rainHrs), desc: 'Berhenti operasi akibat cuaca hujan & jalan licin' },
+          { cat: 'Standby Ready', hrs: ov.stbyHrs, p: pct(ov.stbyHrs), desc: 'Unit ready namun menunggu alokasi operasi / operator' }
+        ];
+        tbodyTimeDetail.innerHTML = timeRows.map((tr) => `
+          <tr class="border-b border-slate-200">
+            <td class="px-2.5 py-1.5 font-semibold text-slate-800">${tr.cat}</td>
+            <td class="px-2.5 py-1.5 text-right font-bold">${tr.hrs.toFixed(1)} Jam</td>
+            <td class="px-2.5 py-1.5 text-right">${tr.p.toFixed(1)}%</td>
+            <td class="px-2.5 py-1.5 text-slate-600">${tr.desc}</td>
+          </tr>`).join('') + `
+          <tr class="bg-slate-900 text-white font-bold">
+            <td class="px-2.5 py-1.5 uppercase">TOTAL CALENDAR HOURS</td>
+            <td class="px-2.5 py-1.5 text-right">${totalCal.toFixed(1)} Jam</td>
+            <td class="px-2.5 py-1.5 text-right">100.0%</td>
+            <td class="px-2.5 py-1.5 font-normal text-slate-200">Akumulasi total kuota jam seluruh populasi unit On-Hired</td>
+          </tr>`;
+      }
+    }
+
     // Monthly Detailed Pareto Table (Hidden in Weekly mode, Shown in Monthly Management Detail mode)
     const paretoWrap = document.getElementById('rep-monthly-pareto-wrap');
     const tbodyPareto = document.getElementById('rep-tbody-pareto-detail');
@@ -3470,15 +3501,47 @@ const ReportModule = {
             <td class="px-2.5 py-1.5 text-right">${m.mtbr.toFixed(2)}j</td>
           </tr>`).join('');
 
-    // 3.3 Unit Table (Weekly = Watchlist PA < 85%, Monthly = Full Fleet Audit)
+    // Monthly Daily Performance Log Table (Hidden in Weekly, Shown in Monthly)
+    const dailyWrap = document.getElementById('rep-monthly-daily-wrap');
+    const dailyBadge = document.getElementById('rep-daily-log-badge');
+    const tbodyDailyLog = document.getElementById('rep-tbody-daily-log');
+    if (isWeekly) {
+      dailyWrap?.classList.add('hidden');
+    } else {
+      dailyWrap?.classList.remove('hidden');
+      const dailyRows = this.kpiData.trend || [];
+      if (dailyBadge) dailyBadge.textContent = `${dailyRows.length} Hari Tercatat`;
+      if (tbodyDailyLog) {
+        tbodyDailyLog.innerHTML = dailyRows.length === 0
+          ? `<tr><td colspan="13" class="px-3 py-3 text-center text-slate-400">Belum ada log harian pada periode ini.</td></tr>`
+          : dailyRows.map((d) => `
+              <tr class="border-b border-slate-200">
+                <td class="px-2 py-1.5 font-bold text-slate-900">${d.date}</td>
+                <td class="px-2 py-1.5 text-slate-600">${d.dayName || '-'}</td>
+                <td class="px-2 py-1.5 text-right">${d.unitCount ?? '-'}</td>
+                <td class="px-2 py-1.5 text-right">${d.calHrs !== undefined ? Number(d.calHrs).toFixed(1) : '-'}</td>
+                <td class="px-2 py-1.5 text-right font-semibold">${d.wh !== undefined ? Number(d.wh).toFixed(1) : '-'}</td>
+                <td class="px-2 py-1.5 text-right text-rose-700">${d.bdUnsched !== undefined ? Number(d.bdUnsched).toFixed(1) : '-'}</td>
+                <td class="px-2 py-1.5 text-right text-amber-700">${d.bdSched !== undefined ? Number(d.bdSched).toFixed(1) : '-'}</td>
+                <td class="px-2 py-1.5 text-right text-sky-700">${d.rainHrs !== undefined ? Number(d.rainHrs).toFixed(1) : '-'}</td>
+                <td class="px-2 py-1.5 text-right">${d.stbyHrs !== undefined ? Number(d.stbyHrs).toFixed(1) : '-'}</td>
+                <td class="px-2 py-1.5 text-right font-bold ${d.pa >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.pa).toFixed(2)}%</td>
+                <td class="px-2 py-1.5 text-right font-bold ${d.ma >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.ma).toFixed(2)}%</td>
+                <td class="px-2 py-1.5 text-right font-bold ${d.ua >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.ua).toFixed(2)}%</td>
+                <td class="px-2 py-1.5 text-right">${d.mttr !== undefined ? Number(d.mttr).toFixed(2) + 'j' : '-'}</td>
+              </tr>`).join('');
+      }
+    }
+
+    // 3.3 Unit Table (Weekly = Watchlist PA < 85%, Monthly = Full Fleet Audit Sorted High PA -> Low PA)
     const allUnits = [...(this.kpiData.byUnit || [])];
     const displayUnits = isWeekly
       ? allUnits.filter((u) => u.pa < target).sort((a, b) => a.pa - b.pa)
-      : allUnits.sort((a, b) => a.unitId.localeCompare(b.unitId));
+      : allUnits.sort((a, b) => b.pa - a.pa || a.unitId.localeCompare(b.unitId));
 
     document.getElementById('rep-unit-section-title').textContent = isWeekly
       ? '3.3 Watchlist Unit Prioritas (PA Di Bawah Target 85%)'
-      : '3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan Manajemen)';
+      : '3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan — Urut PA Tertinggi ke Terendah)';
     document.getElementById('rep-unit-section-badge').textContent = isWeekly
       ? `${displayUnits.length} Unit Perlu Perhatian`
       : `Total ${displayUnits.length} Unit Dievaluasi`;
@@ -3524,7 +3587,123 @@ const ReportModule = {
   },
 
   /**
-   * Loads logo-ktc.png into Base64 PNG for embedding inside jsPDF header
+   * Renders Daily Trend & Component Pareto Charts synchronously (animation: false + white background)
+   * so they always appear in both the web preview and the exported PDF.
+   */
+  renderReportCharts(target) {
+    if (!this.kpiData || typeof Chart === 'undefined') return;
+
+    const whiteBgPlugin = {
+      id: 'reportWhiteBg',
+      beforeDraw: (chart) => {
+        const { ctx } = chart;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, chart.width, chart.height);
+        ctx.restore();
+      }
+    };
+
+    const trendCanvas = document.getElementById('rep-chart-trend');
+    if (trendCanvas) {
+      if (this.trendChart) this.trendChart.destroy();
+      const trendList = this.kpiData.trend || [];
+      this.trendChart = new Chart(trendCanvas, {
+        type: 'line',
+        data: {
+          labels: trendList.map((t) => String(t.date || '').slice(5)),
+          datasets: [
+            {
+              label: 'PA (%)',
+              data: trendList.map((t) => t.pa),
+              borderColor: '#2563eb',
+              backgroundColor: 'rgba(37, 99, 235, 0.08)',
+              tension: 0.25,
+              borderWidth: 2,
+              pointRadius: 2.5
+            },
+            {
+              label: 'MA (%)',
+              data: trendList.map((t) => t.ma),
+              borderColor: '#059669',
+              backgroundColor: 'rgba(5, 150, 105, 0.08)',
+              tension: 0.25,
+              borderWidth: 2,
+              pointRadius: 2.5
+            },
+            {
+              label: 'UA (%)',
+              data: trendList.map((t) => t.ua),
+              borderColor: '#d97706',
+              backgroundColor: 'rgba(217, 119, 6, 0.08)',
+              tension: 0.25,
+              borderWidth: 2,
+              pointRadius: 2.5
+            },
+            {
+              label: `Target (${target}%)`,
+              data: trendList.map(() => target),
+              borderColor: '#e11d48',
+              borderDash: [5, 5],
+              borderWidth: 1.5,
+              pointRadius: 0,
+              fill: false
+            }
+          ]
+        },
+        options: {
+          animation: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } }
+          },
+          scales: {
+            y: { min: 0, max: 100, ticks: { font: { size: 9 }, callback: (v) => v + '%' } },
+            x: { ticks: { font: { size: 9 } } }
+          }
+        },
+        plugins: [whiteBgPlugin]
+      });
+    }
+
+    const paretoCanvas = document.getElementById('rep-chart-pareto');
+    if (paretoCanvas) {
+      if (this.paretoChart) this.paretoChart.destroy();
+      const limit = this.reportType === 'WEEKLY' ? 5 : 10;
+      const topItems = (this.kpiData.pareto || []).slice(0, limit);
+      this.paretoChart = new Chart(paretoCanvas, {
+        type: 'bar',
+        data: {
+          labels: topItems.map((p) => p.component),
+          datasets: [
+            {
+              label: 'BD Unscheduled (Jam)',
+              data: topItems.map((p) => p.totalHours),
+              backgroundColor: '#e11d48',
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          animation: false,
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { font: { size: 9 } } },
+            y: { ticks: { font: { size: 9 } } }
+          }
+        },
+        plugins: [whiteBgPlugin]
+      });
+    }
+  },
+
+  /**
+   * Loads logo-ktc.png into a lightweight scaled Base64 PNG for compact PDF file size
    */
   loadLogoDataUrl(src) {
     return new Promise((resolve) => {
@@ -3532,11 +3711,15 @@ const ReportModule = {
       img.crossOrigin = 'Anonymous';
       img.onload = () => {
         try {
+          const natW = img.naturalWidth || 120;
+          const natH = img.naturalHeight || 120;
+          const maxH = 96;
+          const scale = Math.min(1, maxH / natH);
           const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth || 120;
-          canvas.height = img.naturalHeight || 120;
+          canvas.width = Math.round(natW * scale);
+          canvas.height = Math.round(natH * scale);
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           resolve({
             dataUrl: canvas.toDataURL('image/png'),
             ratio: canvas.width / canvas.height
@@ -3552,7 +3735,9 @@ const ReportModule = {
 
   /**
    * Direct A4 Landscape Formal Paper PDF Generator (jsPDF + AutoTable)
-   * Bypasses browser window.print() blocking and downloads an official .pdf file directly.
+   * - Weekly Mode: Concise 2-page Tactical Operational Report
+   * - Monthly Mode: Comprehensive Multi-page Management Audit Report
+   * - Compressed PDF output (~120-250 KB) with crisp JPEG chart snapshots
    */
   async downloadPdf() {
     if (!this.kpiData) {
@@ -3570,9 +3755,12 @@ const ReportModule = {
     }
 
     try {
+      const target = this.kpiData.target || APP_CONFIG.KPI_TARGET;
+      this.renderReportCharts(target);
+
       const logoAsset = await this.loadLogoDataUrl('logo-ktc.png');
       const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
       const pageW = doc.internal.pageSize.getWidth();   // 297 mm
       const pageH = doc.internal.pageSize.getHeight();  // 210 mm
       const margin = 12;
@@ -3583,7 +3771,6 @@ const ReportModule = {
       const endDate = document.getElementById('rep-end-date')?.value || '-';
       const model = document.getElementById('rep-filter-model')?.value || 'ALL';
       const isWeekly = this.reportType === 'WEEKLY';
-      const target = this.kpiData.target || APP_CONFIG.KPI_TARGET;
       const ov = this.kpiData.overall;
 
       // --- OFFICIAL HEADER BANNER ---
@@ -3596,7 +3783,7 @@ const ReportModule = {
         const logoW = Math.min(26, logoH * (logoAsset.ratio || 1));
         doc.setFillColor(255, 255, 255);
         doc.roundedRect(margin + 3, 13, logoW + 2, logoH, 1.2, 1.2, 'F');
-        doc.addImage(logoAsset.dataUrl, 'PNG', margin + 4, 13.8, logoW, logoH - 1.6);
+        doc.addImage(logoAsset.dataUrl, 'PNG', margin + 4, 13.8, logoW, logoH - 1.6, undefined, 'FAST');
         headerTextX = margin + logoW + 8;
       }
 
@@ -3705,7 +3892,33 @@ const ReportModule = {
       doc.setFontSize(7.5);
       doc.setTextColor(51, 65, 85);
       doc.text(timeSegs.map((s) => `• ${s.label}`).join('     '), margin, curY);
-      curY += 5.5;
+      curY += 5;
+
+      // Monthly Only: Detailed Calendar Time Allocation Table on Page 1
+      if (!isWeekly) {
+        doc.autoTable({
+          startY: curY,
+          margin: { left: margin, right: margin },
+          head: [['Kategori Alokasi Waktu Kalender', 'Total Jam Aktual', 'Proporsi (%)', 'Keterangan Faktor Operasional / Teknis']],
+          body: [
+            ['Working Hours (WH)', `${ov.wh.toFixed(1)} Jam`, `${pct(ov.wh).toFixed(1)}%`, 'Jam produktif unit beroperasi di lapangan'],
+            ['Breakdown Unscheduled (USCH / ACD)', `${ov.bdUnsched.toFixed(1)} Jam`, `${pct(ov.bdUnsched).toFixed(1)}%`, `Kerusakan mendadak (${ov.freqUnsched || 0} kejadian) — Faktor Plant`],
+            ['Breakdown Scheduled (SCH / SVC)', `${ov.bdSched.toFixed(1)} Jam`, `${pct(ov.bdSched).toFixed(1)}%`, 'Perawatan berkala & servis terjadwal — Faktor Plant'],
+            ['Rain & Slippery', `${ov.rainHrs.toFixed(1)} Jam`, `${pct(ov.rainHrs).toFixed(1)}%`, 'Berhenti operasi akibat cuaca hujan & jalan licin'],
+            ['Standby Ready', `${ov.stbyHrs.toFixed(1)} Jam`, `${pct(ov.stbyHrs).toFixed(1)}%`, 'Unit ready namun menunggu alokasi operasi / operator']
+          ],
+          foot: [['TOTAL CALENDAR HOURS', `${totalCal.toFixed(1)} Jam`, '100.0%', 'Akumulasi total kuota jam seluruh populasi unit On-Hired']],
+          theme: 'grid',
+          styles: { fontSize: 7.3, cellPadding: 1.6 },
+          headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+          footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+          columnStyles: {
+            1: { halign: 'right', cellWidth: 34 },
+            2: { halign: 'right', cellWidth: 26 }
+          }
+        });
+        curY = doc.lastAutoTable.finalY + 5;
+      }
 
       // 1.2 Executive Summary Narrative Box
       doc.setFont('helvetica', 'bold');
@@ -3728,7 +3941,8 @@ const ReportModule = {
       curY += boxH + 6;
 
       // --- BAB II. ANALISIS TREN & PARETO KOMPONEN ---
-      if (curY > 130) {
+      // Weekly fits BAB II on Page 1; Monthly gives BAB II a dedicated clean Page 2 with full Pareto table
+      if (!isWeekly || curY > 132) {
         doc.addPage();
         curY = 15;
       }
@@ -3743,18 +3957,23 @@ const ReportModule = {
       const trendCanvas = document.getElementById('rep-chart-trend');
       const paretoCanvas = document.getElementById('rep-chart-pareto');
       if (trendCanvas && paretoCanvas) {
-        const trendImg = trendCanvas.toDataURL('image/png', 1.0);
-        const paretoImg = paretoCanvas.toDataURL('image/png', 1.0);
+        const trendImg = trendCanvas.toDataURL('image/jpeg', 0.85);
+        const paretoImg = paretoCanvas.toDataURL('image/jpeg', 0.85);
         const leftW = contentW * 0.62;
         const rightW = contentW * 0.36;
+        const chartH = isWeekly ? 42 : 52;
 
         doc.setFontSize(7.8);
         doc.text('Gambar 2.1 Tren Harian PA, MA & UA (%) vs Target 85%', margin, curY + 2);
-        doc.text('Gambar 2.2 Top Komponen Breakdown (Jam)', margin + leftW + 5, curY + 2);
+        doc.text(
+          isWeekly ? 'Gambar 2.2 Top 5 Komponen Breakdown (Jam)' : 'Gambar 2.2 Top 10 Komponen Breakdown Pareto (Jam)',
+          margin + leftW + 5,
+          curY + 2
+        );
 
-        doc.addImage(trendImg, 'PNG', margin, curY + 3.5, leftW, 44);
-        doc.addImage(paretoImg, 'PNG', margin + leftW + 5, curY + 3.5, rightW, 44);
-        curY += 51;
+        doc.addImage(trendImg, 'JPEG', margin, curY + 3.5, leftW, chartH, undefined, 'FAST');
+        doc.addImage(paretoImg, 'JPEG', margin + leftW + 5, curY + 3.5, rightW, chartH, undefined, 'FAST');
+        curY += chartH + 7;
       }
 
       // Monthly Detailed Pareto Table
@@ -3853,18 +4072,18 @@ const ReportModule = {
       });
       curY = doc.lastAutoTable.finalY + 6;
 
-      // 3.3 Unit Table (Weekly Watchlist vs Monthly Full Audit)
+      // 3.3 Unit Table (Weekly = Watchlist PA < 85%, Monthly = Full Fleet Audit Sorted High PA -> Low PA)
       const allUnits = [...(this.kpiData.byUnit || [])];
       const unitList = isWeekly
         ? allUnits.filter((u) => u.pa < target).sort((a, b) => a.pa - b.pa)
-        : allUnits.sort((a, b) => a.unitId.localeCompare(b.unitId));
+        : allUnits.sort((a, b) => b.pa - a.pa || a.unitId.localeCompare(b.unitId));
 
       doc.setFontSize(8.5);
       doc.setTextColor(15, 23, 42);
       doc.text(
         isWeekly
           ? `3.3 Watchlist Unit Prioritas (PA < ${target}%): ${unitList.length} Unit`
-          : `3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan Manajemen): ${unitList.length} Unit`,
+          : `3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan — Urut PA Tertinggi ke Terendah): ${unitList.length} Unit`,
         margin,
         curY
       );
@@ -3901,24 +4120,66 @@ const ReportModule = {
       });
       curY = doc.lastAutoTable.finalY + 6;
 
-      // 3.4 Fleet Roster Mutation Audit Table in PDF
-      const mutations = this.kpiData.rosterMutations || [];
-      doc.setFontSize(8.5);
-      doc.setTextColor(146, 64, 14);
-      doc.text(`3.4 Catatan Mutasi Status Armada / On-Hired <-> Off-Hired Audit Log (${mutations.length} Mutasi)`, margin, curY);
-      curY += 2;
+      // Monthly Only: 3.4 Daily Fleet Performance Log (Date 1 to End of Month)
+      if (!isWeekly && (this.kpiData.trend || []).length > 0) {
+        doc.setFontSize(8.5);
+        doc.setTextColor(15, 23, 42);
+        doc.text(`3.4 Log Performa Harian Armada (${this.kpiData.trend.length} Hari Evaluasi)`, margin, curY);
+        curY += 2;
 
-      const mutRows = mutations.map((m) => [m.timestamp, m.unitId, m.actionType, m.username, m.detail]);
-      doc.autoTable({
-        startY: curY,
-        margin: { left: margin, right: margin },
-        head: [['Waktu', 'Unit ID', 'Jenis Mutasi', 'Oleh', 'Keterangan Teknis & Unit Pengganti']],
-        body: mutRows.length > 0 ? mutRows : [['-', '-', '-', '-', 'Tidak ada perubahan mutasi status armada selama periode laporan ini.']],
-        theme: 'grid',
-        styles: { fontSize: 7.2, cellPadding: 1.6 },
-        headStyles: { fillColor: [146, 64, 14], textColor: 255, fontStyle: 'bold' }
-      });
-      curY = doc.lastAutoTable.finalY + 8;
+        const dailyLogRows = this.kpiData.trend.map((d) => [
+          d.date,
+          d.dayName || '-',
+          d.unitCount !== undefined ? String(d.unitCount) : '-',
+          d.calHrs !== undefined ? Number(d.calHrs).toFixed(1) : '-',
+          d.wh !== undefined ? Number(d.wh).toFixed(1) : '-',
+          d.bdUnsched !== undefined ? Number(d.bdUnsched).toFixed(1) : '-',
+          d.bdSched !== undefined ? Number(d.bdSched).toFixed(1) : '-',
+          d.rainHrs !== undefined ? Number(d.rainHrs).toFixed(1) : '-',
+          d.stbyHrs !== undefined ? Number(d.stbyHrs).toFixed(1) : '-',
+          `${Number(d.pa).toFixed(2)}%`,
+          `${Number(d.ma).toFixed(2)}%`,
+          `${Number(d.ua).toFixed(2)}%`,
+          d.mttr !== undefined ? `${Number(d.mttr).toFixed(2)}j` : '-'
+        ]);
+
+        doc.autoTable({
+          startY: curY,
+          margin: { left: margin, right: margin },
+          head: [['Tanggal', 'Hari', 'Unit', 'Cal Hrs', 'WH', 'BD Unsch', 'BD Sch', 'Rain', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR']],
+          body: dailyLogRows,
+          theme: 'grid',
+          styles: { fontSize: 7.0, cellPadding: 1.5 },
+          headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+          columnStyles: {
+            2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
+            6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' },
+            9: { halign: 'right', fontStyle: 'bold' }, 10: { halign: 'right' }, 11: { halign: 'right' }, 12: { halign: 'right' }
+          }
+        });
+        curY = doc.lastAutoTable.finalY + 6;
+      }
+
+      // Monthly Only: 3.5 Fleet Roster Mutation Audit Table in PDF
+      if (!isWeekly) {
+        const mutations = this.kpiData.rosterMutations || [];
+        doc.setFontSize(8.5);
+        doc.setTextColor(146, 64, 14);
+        doc.text(`3.5 Catatan Mutasi Status Armada / On-Hired <-> Off-Hired Audit Log (${mutations.length} Mutasi)`, margin, curY);
+        curY += 2;
+
+        const mutRows = mutations.map((m) => [m.timestamp, m.unitId, m.actionType, m.username, m.detail]);
+        doc.autoTable({
+          startY: curY,
+          margin: { left: margin, right: margin },
+          head: [['Waktu', 'Unit ID', 'Jenis Mutasi', 'Oleh', 'Keterangan Teknis & Unit Pengganti']],
+          body: mutRows.length > 0 ? mutRows : [['-', '-', '-', '-', 'Tidak ada perubahan mutasi status armada selama periode laporan ini.']],
+          theme: 'grid',
+          styles: { fontSize: 7.2, cellPadding: 1.6 },
+          headStyles: { fillColor: [146, 64, 14], textColor: 255, fontStyle: 'bold' }
+        });
+        curY = doc.lastAutoTable.finalY + 8;
+      }
 
       // --- BAB IV. REKOMENDASI & LEMBAR PENGESAHAN ---
       if (curY > pageH - 68) {
@@ -4066,13 +4327,13 @@ function getDemoApiResponse(action, payload, session) {
         stbyHrs: 48.0
       },
       trend: [
-        { date: '2026-11-08', pa: 89.5, ma: 92.0, ua: 86.4 },
-        { date: '2026-11-09', pa: 87.0, ma: 90.5, ua: 88.1 },
-        { date: '2026-11-10', pa: 91.2, ma: 94.0, ua: 89.5 },
-        { date: '2026-11-11', pa: 84.5, ma: 88.2, ua: 85.0 },
-        { date: '2026-11-12', pa: 88.8, ma: 92.4, ua: 87.2 },
-        { date: '2026-11-13', pa: 90.0, ma: 93.1, ua: 88.0 },
-        { date: '2026-11-14', pa: 86.8, ma: 91.2, ua: 86.2 }
+        { date: '2026-11-08', dayName: 'Sunday', unitCount: 3, calHrs: 60, wh: 49.0, bdUnsched: 4.0, bdSched: 2.0, rainHrs: 1.0, stbyHrs: 4.0, pa: 90.0, ma: 92.45, ua: 90.74, mttr: 2.0 },
+        { date: '2026-11-09', dayName: 'Monday', unitCount: 3, calHrs: 60, wh: 47.0, bdUnsched: 5.0, bdSched: 2.8, rainHrs: 1.2, stbyHrs: 4.0, pa: 87.0, ma: 90.38, ua: 90.04, mttr: 2.5 },
+        { date: '2026-11-10', dayName: 'Tuesday', unitCount: 3, calHrs: 60, wh: 50.0, bdUnsched: 3.2, bdSched: 2.0, rainHrs: 0.8, stbyHrs: 4.0, pa: 91.33, ma: 93.98, ua: 91.24, mttr: 1.6 },
+        { date: '2026-11-11', dayName: 'Wednesday', unitCount: 3, calHrs: 60, wh: 44.0, bdUnsched: 6.3, bdSched: 3.0, rainHrs: 2.0, stbyHrs: 4.7, pa: 84.5, ma: 87.48, ua: 86.79, mttr: 3.15 },
+        { date: '2026-11-12', dayName: 'Thursday', unitCount: 3, calHrs: 60, wh: 48.0, bdUnsched: 4.2, bdSched: 2.5, rainHrs: 1.0, stbyHrs: 4.3, pa: 88.83, ma: 91.95, ua: 90.06, mttr: 2.1 },
+        { date: '2026-11-13', dayName: 'Friday', unitCount: 3, calHrs: 57, wh: 46.0, bdUnsched: 3.7, bdSched: 2.0, rainHrs: 1.3, stbyHrs: 4.0, pa: 90.0, ma: 92.56, ua: 89.67, mttr: 1.85 },
+        { date: '2026-11-14', dayName: 'Saturday', unitCount: 3, calHrs: 60, wh: 46.5, bdUnsched: 4.9, bdSched: 3.0, rainHrs: 1.0, stbyHrs: 4.6, pa: 86.83, ma: 90.47, ua: 89.25, mttr: 2.45 }
       ],
       pareto: [
         { component: 'HYD - Hydraulic System', totalHours: 28.5 },
