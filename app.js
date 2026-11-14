@@ -242,7 +242,7 @@ function switchAppTab(tabId) {
     PopulationModule.loadMonth();
   } else if (tabId === 'tab-report') {
     ReportModule.init();
-    ReportModule.load();
+    ReportModule.resetPreview();
   }
 }
 
@@ -3089,6 +3089,7 @@ const PopulationModule = {
 const ReportModule = {
   reportType: 'MONTHLY', // 'WEEKLY' | 'MONTHLY'
   kpiData: null,
+  loadedMeta: null,
   analysisData: {
     source: 'SMART_ENGINE',
     summaryText: '',
@@ -3112,6 +3113,39 @@ const ReportModule = {
     }
   },
 
+  resetPreview() {
+    this.kpiData = null;
+    this.loadedMeta = null;
+    document.getElementById('pdf-printable-sheet')?.classList.add('hidden');
+    document.getElementById('rep-empty-placeholder')?.classList.remove('hidden');
+
+    const btnAi = document.getElementById('btn-report-ai');
+    const btnPdf = document.getElementById('btn-download-pdf');
+    const statusMsg = document.getElementById('rep-status-msg');
+    const aiBadge = document.getElementById('rep-ai-badge');
+
+    if (btnAi) btnAi.disabled = true;
+    if (btnPdf) btnPdf.disabled = true;
+    if (statusMsg) {
+      statusMsg.innerHTML = 'Select report mode &amp; period above, then click <strong>Load Report Data</strong> to preview.';
+      statusMsg.className = 'text-xs text-slate-500';
+    }
+    if (aiBadge) aiBadge.textContent = 'Analysis Engine: Standby';
+  },
+
+  markStale() {
+    if (!this.kpiData) return;
+    const btnPdf = document.getElementById('btn-download-pdf');
+    const btnAi = document.getElementById('btn-report-ai');
+    const statusMsg = document.getElementById('rep-status-msg');
+    if (btnPdf) btnPdf.disabled = true;
+    if (btnAi) btnAi.disabled = true;
+    if (statusMsg) {
+      statusMsg.innerHTML = 'Filter parameters changed. Click <strong>Load Report Data</strong> to update report preview &amp; enable PDF download.';
+      statusMsg.className = 'text-xs text-amber-600 font-semibold';
+    }
+  },
+
   applyMonthPicker(monthVal) {
     if (!monthVal) return;
     const [yStr, mStr] = monthVal.split('-');
@@ -3122,7 +3156,7 @@ const ReportModule = {
     const endInput = document.getElementById('rep-end-date');
     if (startInput) startInput.value = `${yStr}-${mStr}-01`;
     if (endInput) endInput.value = `${yStr}-${mStr}-${String(lastDay).padStart(2, '0')}`;
-    this.load();
+    this.markStale();
   },
 
   toggleNarrativeEditor() {
@@ -3199,10 +3233,10 @@ const ReportModule = {
       this.applyDatePreset('MTD', false);
     }
 
-    this.load();
+    this.markStale();
   },
 
-  applyDatePreset(preset, triggerLoad = true) {
+  applyDatePreset(preset, notifyStale = true) {
     const startInput = document.getElementById('rep-start-date');
     const endInput = document.getElementById('rep-end-date');
     const monthPicker = document.getElementById('rep-month-picker');
@@ -3230,7 +3264,7 @@ const ReportModule = {
       monthPicker.value = startInput.value.slice(0, 7);
     }
 
-    if (triggerLoad) this.load();
+    if (notifyStale) this.markStale();
   },
 
   syncCustomNotes() {
@@ -3254,9 +3288,17 @@ const ReportModule = {
     const endDate = document.getElementById('rep-end-date')?.value;
     const model = document.getElementById('rep-filter-model')?.value || 'ALL';
     const statusMsg = document.getElementById('rep-status-msg');
+    const btnLoad = document.getElementById('btn-load-report');
     if (!startDate || !endDate) return;
 
-    if (statusMsg) statusMsg.textContent = 'Preparing executive report preview...';
+    if (btnLoad) {
+      btnLoad.disabled = true;
+      btnLoad.textContent = 'Loading...';
+    }
+    if (statusMsg) {
+      statusMsg.textContent = 'Loading report dataset...';
+      statusMsg.className = 'text-xs text-blue-600 font-medium';
+    }
 
     const res = await callBackendApi('GET_DASHBOARD_KPI', {
       site: AuthModule.currentSite,
@@ -3265,41 +3307,65 @@ const ReportModule = {
       model: model
     });
 
+    if (btnLoad) {
+      btnLoad.disabled = false;
+      btnLoad.textContent = 'Load Report Data';
+    }
+
     if (res.status === 'success') {
       this.kpiData = res;
+      this.loadedMeta = {
+        site: AuthModule.currentSite,
+        startDate: startDate,
+        endDate: endDate,
+        model: model,
+        reportType: this.reportType
+      };
       this.analysisData = this.buildLocalIndonesianAnalysis(res, startDate, endDate, model, this.reportType);
       this.syncNarrativeEditorInputs();
+
+      document.getElementById('rep-empty-placeholder')?.classList.add('hidden');
+      document.getElementById('pdf-printable-sheet')?.classList.remove('hidden');
+      const btnAi = document.getElementById('btn-report-ai');
+      const btnPdf = document.getElementById('btn-download-pdf');
+      if (btnAi) btnAi.disabled = false;
+      if (btnPdf) btnPdf.disabled = false;
+
       this.renderPreviewSheet();
       if (statusMsg) {
-        statusMsg.textContent = `Executive report ready (${this.reportType === 'WEEKLY' ? 'Weekly Operational' : 'Monthly Management Detail'}).`;
+        statusMsg.textContent = `Report loaded (${this.reportType === 'WEEKLY' ? 'Weekly Operational' : 'Monthly Management Detail'} • ${startDate} to ${endDate}).`;
+        statusMsg.className = 'text-xs text-emerald-600 font-semibold';
       }
     } else if (statusMsg) {
       statusMsg.textContent = res.message || 'Failed to load report data.';
+      statusMsg.className = 'text-xs text-rose-600 font-semibold';
     }
   },
 
   async enhanceWithAi() {
-    if (!this.kpiData) {
-      await this.load();
+    if (!this.kpiData || !this.loadedMeta) {
+      showToast('Please click "Load Report Data" first before generating AI analysis.', 'warning');
+      return;
     }
     const btn = document.getElementById('btn-report-ai');
     const statusMsg = document.getElementById('rep-status-msg');
-    const startDate = document.getElementById('rep-start-date')?.value;
-    const endDate = document.getElementById('rep-end-date')?.value;
-    const model = document.getElementById('rep-filter-model')?.value || 'ALL';
+    const { site, startDate, endDate, model, reportType } = this.loadedMeta;
 
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '<span>&#9203;</span><span>Generating Gemini AI Analysis...</span>';
     }
-    if (statusMsg) statusMsg.textContent = 'Connecting to Gemini AI Reliability Engine...';
+    if (statusMsg) {
+      statusMsg.textContent = 'Connecting to Gemini AI Reliability Engine...';
+      statusMsg.className = 'text-xs text-indigo-600 font-medium';
+    }
 
     const res = await callBackendApi('GENERATE_AI_REPORT', {
-      site: AuthModule.currentSite,
+      site: site,
       startDate: startDate,
       endDate: endDate,
       model: model,
-      reportType: this.reportType
+      reportType: reportType
     });
 
     if (btn) {
@@ -3308,7 +3374,7 @@ const ReportModule = {
     }
 
     if (res.status === 'success' && res.summaryText) {
-      const localFallback = this.buildLocalIndonesianAnalysis(this.kpiData, startDate, endDate, model, this.reportType);
+      const localFallback = this.buildLocalIndonesianAnalysis(this.kpiData, startDate, endDate, model, reportType);
       this.analysisData = {
         source: res.source || 'GEMINI_AI',
         summaryText: res.summaryText,
@@ -3321,11 +3387,14 @@ const ReportModule = {
       this.renderPreviewSheet();
       showToast(
         res.source === 'GEMINI_AI'
-          ? 'Gemini AI Chapter-by-Chapter Analysis generated!'
-          : 'Smart Reliability Engine chapter narratives updated.',
+          ? 'Gemini AI Deep Reliability Analysis generated!'
+          : 'Smart Reliability Engine narratives updated.',
         'success'
       );
-      if (statusMsg) statusMsg.textContent = 'Chapter narratives updated (BAB I - IV). Ready to download PDF.';
+      if (statusMsg) {
+        statusMsg.textContent = `Narrative updated (${res.source === 'GEMINI_AI' ? 'Gemini AI' : 'Smart Rule Engine'}). Ready to download PDF.`;
+        statusMsg.className = 'text-xs text-emerald-600 font-semibold';
+      }
     } else {
       if (statusMsg) statusMsg.textContent = 'Executive analysis ready using Smart Reliability Engine.';
       showToast(res.message || 'Using Smart Rule Engine analysis.', 'warning');
@@ -3340,45 +3409,63 @@ const ReportModule = {
     const uaOk = ov.ua >= target;
     const totalCal = Math.round((ov.wh + ov.bdUnsched + ov.bdSched + ov.rainHrs + ov.stbyHrs) * 10) / 10;
     const whPct = totalCal > 0 ? ((ov.wh / totalCal) * 100).toFixed(1) : '0.0';
+    const totalBdHrs = Math.round((ov.bdUnsched + ov.bdSched) * 10) / 10;
+    const excessBdHrs = Math.max(0, Math.round((totalBdHrs - totalCal * 0.15) * 10) / 10);
+
     const topComp = kpiRes.pareto && kpiRes.pareto.length > 0 ? kpiRes.pareto[0] : null;
+    const secondComp = kpiRes.pareto && kpiRes.pareto.length > 1 ? kpiRes.pareto[1] : null;
     const totParetoHrs = (kpiRes.pareto || []).reduce((acc, p) => acc + p.totalHours, 0);
+
+    const trendList = kpiRes.trend || [];
+    const bestDay = trendList.reduce((best, d) => (!best || d.pa > best.pa ? d : best), null);
+    const worstDay = trendList.reduce((worst, d) => (!worst || d.pa < worst.pa ? d : worst), null);
+
     const lowestUnits = (kpiRes.byUnit || []).filter((u) => u.pa < target).sort((a, b) => a.pa - b.pa);
     const modelsSorted = [...(kpiRes.byModel || [])].sort((a, b) => b.pa - a.pa);
-    const openCount = (kpiRes.activeBreakdowns || []).length;
+    const openBds = kpiRes.activeBreakdowns || [];
+    const openCount = openBds.length;
     const mutCount = (kpiRes.rosterMutations || []).length;
 
     const scopeLabel = isWeekly
       ? `evaluasi operasional mingguan periode ${startDate} s/d ${endDate}`
       : `evaluasi bulanan manajemen periode ${startDate} s/d ${endDate}`;
 
-    // BAB I: Ringkasan Eksekutif (Bahasa komunikatif & mudah dipahami orang awam)
+    // BAB I: Ringkasan Eksekutif (Analisa sebab-akibat mendalam dengan bahasa mudah dipahami manajemen)
     const bab1Parts = [];
     if (paOk) {
       bab1Parts.push(
-        `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi On-Hired' : 'Model ' + filterModel}), tingkat kesiapan fisik armada site ${kpiRes.site} tercapai sangat baik dengan Physical Availability (PA) sebesar ${ov.pa.toFixed(2)}% dan ketangguhan mekanis (MA) ${ov.ma.toFixed(2)}% (melampaui standar target manajemen ${target}%).`
+        `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi On-Hired' : 'Model ' + filterModel}), tingkat kesiapan fisik armada site ${kpiRes.site} tercapai optimal dengan Physical Availability (PA) sebesar ${ov.pa.toFixed(2)}% (+${(ov.pa - target).toFixed(2)}% di atas target ${target}%) dan ketangguhan mekanis (MA) ${ov.ma.toFixed(2)}%.`
       );
     } else {
       bab1Parts.push(
-        `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi On-Hired' : 'Model ' + filterModel}), tingkat kesiapan fisik armada (PA) site ${kpiRes.site} tercatat ${ov.pa.toFixed(2)}% atau masih di bawah target ${target}% (selisih ${(ov.pa - target).toFixed(2)}%), terutama akibat kerusakan mendadak (Unscheduled BD) selama ${ov.bdUnsched} jam (${ov.freqUnsched} kali kejadian) dengan rata-rata waktu perbaikan (MTTR) ${ov.mttr.toFixed(2)} jam.`
+        `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi On-Hired' : 'Model ' + filterModel}), kesiapan fisik armada (PA) site ${kpiRes.site} tercatat ${ov.pa.toFixed(2)}% atau tertinggal ${(target - ov.pa).toFixed(2)}% dari target ${target}%, dengan kelebihan waktu henti kerusakan sebesar ${excessBdHrs.toFixed(1)} jam di atas batas toleransi 15%.`
       );
     }
     bab1Parts.push(
-      `Dari total ${totalCal.toFixed(1)} jam jadwal kerja armada, unit beroperasi produktif selama ${ov.wh.toFixed(1)} jam (${whPct}%) dengan tingkat pemanfaatan unit siap pakai (UA) sebesar ${ov.ua.toFixed(2)}% dan rata-rata ketahanan unit bekerja sebelum mengalami kerusakan berikutnya (MTBR) selama ${ov.mtbr.toFixed(2)} jam.`
+      `Dari total ${totalCal.toFixed(1)} jam jadwal kerja armada, unit beroperasi produktif selama ${ov.wh.toFixed(1)} jam (${whPct}%), sementara kehilangan waktu terbagi pada kerusakan mendadak ${ov.bdUnsched.toFixed(1)} jam (${ov.freqUnsched} kejadian), servis terjadwal ${ov.bdSched.toFixed(1)} jam, cuaca hujan ${ov.rainHrs.toFixed(1)} jam, dan standby operasi ${ov.stbyHrs.toFixed(1)} jam.`
+    );
+    bab1Parts.push(
+      `Kecepatan rata-rata tim workshop menyelesaikan perbaikan (MTTR) tercatat ${ov.mttr.toFixed(2)} jam (${ov.mttr <= APP_CONFIG.MTTR_TARGET ? 'lebih cepat dari batas maksimal 4.0 jam' : 'melebihi batas 4.0 jam'}), dengan tingkat pemanfaatan unit siap pakai (UA) ${ov.ua.toFixed(2)}% dan ketahanan antar-kerusakan (MTBR) ${ov.mtbr.toFixed(2)} jam.`
     );
 
-    // BAB II: Penjelasan Tren & Hukum Pareto 80/20
+    // BAB II: Penjelasan Tren Harian & Hukum Pareto 80/20
     const bab2Parts = [];
+    if (bestDay && worstDay && trendList.length > 1) {
+      bab2Parts.push(
+        `Pergerakan tren harian menunjukkan performa kesiapan armada tertinggi dicapai pada tanggal ${bestDay.date} (PA ${Number(bestDay.pa).toFixed(2)}%), sedangkan titik penurunan terdalam terjadi pada tanggal ${worstDay.date} (PA ${Number(worstDay.pa).toFixed(2)}%) akibat akumulasi jam perbaikan pada hari tersebut.`
+      );
+    }
     if (topComp && totParetoHrs > 0) {
       const sharePct = ((topComp.totalHours / totParetoHrs) * 100).toFixed(1);
+      const secondInfo = secondComp
+        ? `, diikuti oleh ${secondComp.component} sebesar ${secondComp.totalHours.toFixed(2)} jam (${((secondComp.totalHours / totParetoHrs) * 100).toFixed(1)}%)`
+        : '';
       bab2Parts.push(
-        `Grafik tren harian di atas memperlihatkan pergerakan kestabilan kesiapan armada sepanjang bulan, sedangkan analisis Pareto mengidentifikasi kelompok kerusakan utama yang paling banyak menyita waktu perbaikan mekanik.`
-      );
-      bab2Parts.push(
-        `Kelompok komponen ${topComp.component} tercatat sebagai penyumbang kerusakan mendadak terbesar dengan total ${topComp.totalHours.toFixed(2)} jam atau menyumbang ${sharePct}% dari seluruh jam breakdown tidak terjadwal — sehingga pencegahan pada sistem ini menjadi prioritas utama peningkatan kesiapan armada.`
+        `Berdasarkan prinsip Pareto (80/20), kelompok komponen ${topComp.component} menjadi akar masalah paling dominan dengan ${topComp.totalHours.toFixed(2)} jam atau ${sharePct}% dari total kerusakan mendadak${secondInfo} — sehingga pengendalian preventif pada komponen ini akan memulihkan sebagian besar kehilangan jam operasi.`
       );
     } else {
       bab2Parts.push(
-        `Tren harian memperlihatkan kestabilan kesiapan mekanis armada terjaga konsisten sepanjang periode evaluasi tanpa adanya lonjakan kerusakan mendadak yang signifikan.`
+        `Tidak terdapat lonjakan kerusakan komponen mendadak yang dominan sepanjang periode evaluasi ini, menandakan kondisi sistem utama armada relatif terkendali.`
       );
     }
 
@@ -3389,38 +3476,47 @@ const ReportModule = {
       const worstM = modelsSorted[modelsSorted.length - 1];
       if (modelsSorted.length > 1) {
         bab3Parts.push(
-          `Secara perbandingan antar-model, armada ${bestM.model} mencatatkan kesiapan fisik tertinggi dengan PA ${bestM.pa.toFixed(2)}%, sedangkan model ${worstM.model} berada pada PA ${worstM.pa.toFixed(2)}% dan memerlukan perhatian pemeliharaan lebih intensif.`
+          `Secara komparasi antar-model, armada ${bestM.model} menjadi tulang punggung dengan kesiapan tertinggi (PA ${bestM.pa.toFixed(2)}%, MA ${bestM.ma.toFixed(2)}%), sedangkan model ${worstM.model} mencatatkan PA ${worstM.pa.toFixed(2)}% sehingga memerlukan pengawasan pemeliharaan lebih ketat.`
         );
       } else {
         bab3Parts.push(
-          `Armada model ${bestM.model} mencatatkan rata-rata PA ${bestM.pa.toFixed(2)}% dengan efisiensi kecepatan perbaikan (MTTR) ${bestM.mttr.toFixed(2)} jam.`
+          `Armada model ${bestM.model} mencatatkan rata-rata PA ${bestM.pa.toFixed(2)}% dengan efisiensi waktu perbaikan (MTTR) ${bestM.mttr.toFixed(2)} jam.`
         );
       }
     }
+    if (lowestUnits.length > 0) {
+      const worstU = lowestUnits[0];
+      bab3Parts.push(
+        `Terdapat ${lowestUnits.length} unit dengan pencapaian PA di bawah target ${target}% dengan kontributor penurunan terbesar pada unit ${worstU.unitId} (PA ${worstU.pa.toFixed(2)}%, BD Unscheduled ${worstU.bdUnsched.toFixed(1)} jam).`
+      );
+    } else {
+      bab3Parts.push(`Seluruh unit pada populasi On-Hired berhasil mempertahankan pencapaian PA di atas standar target manajemen (${target}%).`);
+    }
+    const openDetail = openCount > 0 ? ` (${openBds.map((b) => b.unitId).join(', ')})` : '';
     bab3Parts.push(
-      `Saat ini terdapat ${openCount} unit yang masih dalam proses perbaikan di workshop (belum RFU) serta ${lowestUnits.length} unit dengan pencapaian PA di bawah target ${target}%. Dari sisi tata kelola populasi kontrak, tercatat ${mutCount} mutasi perubahan status armada (On-Hired / Off-Hired) selama periode laporan ini.`
+      `Hingga akhir periode laporan, tercatat ${openCount} unit masih dalam status perbaikan aktif/belum RFU${openDetail} serta ${mutCount} catatan mutasi status populasi (On-Hired / Off-Hired).`
     );
 
     // BAB IV: Kesimpulan Manajemen
     const bab4Conclusion = paOk && uaOk
-      ? `Secara keseluruhan performa kesiapan mekanis maupun pemanfaatan operasional armada site ${kpiRes.site} berada pada kategori SEHAT (memenuhi seluruh target utama manajemen), dengan fokus peningkatan ke depan pada pencegahan kerusakan berulang komponen dominan.`
-      : `Performa armada site ${kpiRes.site} memerlukan langkah korektif terukur pada percepatan penyelesaian unit breakdown aktif, penguatan jadwal preventive maintenance, serta sinergi operasional lapangan guna mengangkat kembali pencapaian PA dan UA di atas target ${target}%.`;
+      ? `Secara keseluruhan performa kesiapan mekanis maupun pemanfaatan operasional armada site ${kpiRes.site} berada pada kategori SEHAT (memenuhi target utama >= ${target}%), dengan fokus pengawalan ke depan pada pencegahan kerusakan berulang komponen ${topComp ? topComp.component : 'utama'} serta percepatan penyelesaian open backlog.`
+      : `Performa armada site ${kpiRes.site} memerlukan intervensi manajerial terfokus pada penyelesaian unit breakdown aktif, penguatan inspeksi preventif komponen ${topComp ? topComp.component : 'kritis'}, serta sinkronisasi jadwal operasi lapangan guna mengembalikan PA dan UA di atas target ${target}%.`;
 
     const recs = [];
     if (topComp) {
-      recs.push(`Lakukan inspeksi preventif terfokus (targeted inspection) dan pastikan ketersediaan fast-moving sparepart untuk kelompok komponen ${topComp.component}.`);
+      recs.push(`Lakukan inspeksi preventif terfokus (targeted inspection) dan pastikan ketersediaan fast-moving sparepart untuk kelompok komponen ${topComp.component} (${topComp.totalHours.toFixed(1)} jam BD).`);
     }
     if (lowestUnits.length > 0) {
       const sample = lowestUnits.slice(0, 3).map((u) => `${u.unitId} (PA ${u.pa.toFixed(1)}%)`).join(', ');
-      recs.push(`Prioritaskan backlog review dan evaluasi teknis pada unit dengan performa di bawah target: ${sample}.`);
+      recs.push(`Prioritaskan backlog review dan evaluasi teknis mendalam pada unit di bawah target: ${sample}.`);
     } else {
       recs.push(`Pertahankan kedisiplinan jadwal Preventive Maintenance (SVC/SCH) dan pemeriksaan harian P2H agar seluruh unit konsisten di atas target ${target}%.`);
     }
     if (openCount > 0) {
-      recs.push(`Percepat penyelesaian perbaikan dan monitoring suplai suku cadang pada ${openCount} unit yang masih berstatus Breakdown (Belum RFU).`);
+      recs.push(`Percepat eksekusi perbaikan dan pengawalan suplai suku cadang pada ${openCount} unit yang masih berstatus Breakdown Belum RFU (${openBds.map((b) => b.unitId).join(', ')}).`);
     }
-    if (ov.stbyHrs > ov.wh * 0.15) {
-      recs.push(`Optimalkan koordinasi harian antara tim Plant dan Operasional/Produksi untuk menekan jam Standby (${ov.stbyHrs} jam).`);
+    if (ov.stbyHrs > ov.wh * 0.12) {
+      recs.push(`Optimalkan koordinasi harian antara tim Plant dan Operasional/Produksi untuk menekan jam Standby (${ov.stbyHrs.toFixed(1)} jam) agar UA meningkat optimal.`);
     }
 
     return {
@@ -3921,8 +4017,9 @@ const ReportModule = {
    * - Monthly Mode: Comprehensive Multi-page Management Audit Report with Plain-Language AI Guides
    */
   async downloadPdf() {
-    if (!this.kpiData) {
-      await this.load();
+    if (!this.kpiData || !this.loadedMeta) {
+      showToast('Please click "Load Report Data" first before downloading the PDF.', 'warning');
+      return;
     }
     if (!window.jspdf || !window.jspdf.jsPDF) {
       showToast('PDF generator library is still loading. Please try again.', 'warning');
@@ -3977,10 +4074,10 @@ const ReportModule = {
       };
 
       const session = getUserSession();
-      const startDate = document.getElementById('rep-start-date')?.value || '-';
-      const endDate = document.getElementById('rep-end-date')?.value || '-';
-      const model = document.getElementById('rep-filter-model')?.value || 'ALL';
-      const isWeekly = this.reportType === 'WEEKLY';
+      const startDate = this.loadedMeta.startDate || '-';
+      const endDate = this.loadedMeta.endDate || '-';
+      const model = this.loadedMeta.model || 'ALL';
+      const isWeekly = this.loadedMeta.reportType === 'WEEKLY';
       const ov = this.kpiData.overall;
 
       // --- OFFICIAL HEADER BANNER ---
@@ -4628,7 +4725,9 @@ const ReportModule = {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<span>Download PDF Report (A4 Landscape)</span>';
+        btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg><span>Download PDF Report (A4 Landscape)</span>`;
       }
     }
   }
