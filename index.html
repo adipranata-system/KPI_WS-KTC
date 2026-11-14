@@ -1140,13 +1140,13 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-              <button type="button" id="btn-report-ai" onclick="ReportModule.enhanceWithAi()"
-                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
+              <button type="button" id="btn-report-ai" disabled onclick="ReportModule.enhanceWithAi()"
+                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow-sm transition">
                 <span>&#10024;</span>
                 <span>Generate AI Analysis (Gemini)</span>
               </button>
-              <button type="button" id="btn-download-pdf" onclick="ReportModule.downloadPdf()"
-                class="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg shadow transition">
+              <button type="button" id="btn-download-pdf" disabled onclick="ReportModule.downloadPdf()"
+                class="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-lg shadow transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
@@ -1190,23 +1190,23 @@
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">From Date</label>
-                <input type="date" id="rep-start-date" onchange="ReportModule.load()"
+                <input type="date" id="rep-start-date" onchange="ReportModule.markStale()"
                   class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">To Date</label>
-                <input type="date" id="rep-end-date" onchange="ReportModule.load()"
+                <input type="date" id="rep-end-date" onchange="ReportModule.markStale()"
                   class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
               </div>
               <div>
                 <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Model Filter</label>
-                <select id="rep-filter-model" onchange="ReportModule.load()"
+                <select id="rep-filter-model" onchange="ReportModule.markStale()"
                   class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
                   <option value="ALL">All Unit Models</option>
                 </select>
               </div>
-              <button type="button" onclick="ReportModule.load()"
-                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition">
+              <button type="button" id="btn-load-report" onclick="ReportModule.load()"
+                class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-sm transition">
                 Load Report Data
               </button>
             </div>
@@ -1273,23 +1273,31 @@
           </div>
 
           <div class="flex items-center justify-between text-xs pt-1">
-            <span id="rep-status-msg" class="text-slate-500">Ready to generate A4 Landscape PDF report.</span>
-            <span id="rep-ai-badge" class="px-2.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">Analysis Engine: Smart Rule Engine</span>
+            <span id="rep-status-msg" class="text-slate-500">Select report mode &amp; period above, then click <strong>Load Report Data</strong> to preview.</span>
+            <span id="rep-ai-badge" class="px-2.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold">Analysis Engine: Standby</span>
           </div>
+        </div>
+
+        <!-- Empty Placeholder Before Clicking "Load Report Data" -->
+        <div id="rep-empty-placeholder" class="bg-white p-10 rounded-xl shadow-sm border-2 border-dashed border-slate-300 text-center space-y-2">
+          <div class="text-sm font-bold text-slate-700">Executive Report Preview Not Loaded Yet</div>
+          <p class="text-xs text-slate-500 max-w-lg mx-auto">
+            Choose <strong>Weekly Operational Report</strong> or <strong>Monthly Management Detail Report</strong>, set your date range and model filter above, then click <strong>Load Report Data</strong> to generate the report preview.
+          </p>
         </div>
 
         <!-- =================================================== -->
         <!-- INDONESIAN EXECUTIVE PAPER PREVIEW (A4 LANDSCAPE)   -->
         <!-- =================================================== -->
-        <div id="pdf-printable-sheet" class="bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-6">
+        <div id="pdf-printable-sheet" class="hidden bg-white p-6 rounded-xl shadow-md border border-slate-200 space-y-6">
 
-          <!-- KOP DOKUMEN RESMI -->
-          <div class="flex flex-wrap items-center justify-between gap-4 pb-3 border-b-2 border-slate-900">
-            <div class="flex items-center gap-3">
+          <!-- Kop Resmi Perusahaan (Formal Indonesian Paper Header) -->
+          <div class="flex flex-wrap items-start justify-between gap-4 border-b-2 border-slate-900 pb-4">
+            <div class="flex items-center gap-3.5">
               <img src="logo-ktc.png" alt="PT. KTC Coal Mining &amp; Energy"
                 onerror="this.style.display='none'; this.nextElementSibling.classList.remove('hidden');"
-                class="h-12 w-auto object-contain" />
-              <div class="hidden w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center font-extrabold text-sm tracking-wider">
+                class="h-14 w-auto object-contain" />
+              <div class="hidden w-12 h-12 rounded-xl bg-slate-900 text-white font-extrabold flex items-center justify-center text-xs">
                 KTC
               </div>
               <div>
@@ -1681,6 +1689,6 @@
   </div>
 
   <!-- External Application Logic Bundle (with version tag to bypass stale browser cache) -->
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
