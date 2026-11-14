@@ -16,7 +16,7 @@
   <!-- Chart.js for Daily Trend & Component Pareto Charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- SheetJS (XLSX) for Excel Parsing & Export -->
+  <!-- SheetJS (XLSX) for Excel Parsing -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
   <!-- jsPDF & AutoTable for Direct A4 Landscape PDF Report Generation -->
@@ -186,7 +186,7 @@
           <!-- Divider for Operational Menus -->
           <span class="admin-only-menu h-4 w-px bg-slate-600 mx-1.5 shrink-0"></span>
 
-          <!-- Operational & Master Group (Admin, Planner & Superadmin) -->
+          <!-- Operational Group (Admin, Planner & Superadmin) -->
           <button type="button" data-tab="tab-upload-bd" onclick="switchAppTab('tab-upload-bd')"
             class="nav-tab-btn admin-only-menu inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold border-b-2 border-transparent text-slate-300 hover:text-white whitespace-nowrap">
             <span class="px-1.5 py-0.2 bg-slate-700 text-blue-300 rounded text-[10px]">1</span>
@@ -626,7 +626,7 @@
             </div>
           </div>
 
-          <!-- Diagnostic Info Box (Shows Unmatched Unit IDs or Date Exclusions if any) -->
+          <!-- Diagnostic Info Box -->
           <div id="excel-diagnostic-box" class="hidden p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-1">
             <div class="font-bold flex items-center gap-1.5">
               <span>&#9888;</span>
@@ -635,7 +635,7 @@
             <p id="excel-diag-body" class="text-[11px] leading-relaxed text-amber-800"></p>
           </div>
 
-          <!-- Parsing Summary Cards (4 Columns: Segments, Unscheduled BD, Scheduled BD, Affected Units) -->
+          <!-- Parsing Summary Cards -->
           <div id="excel-summary-cards" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 pt-1">
             <div class="p-3 rounded-lg bg-blue-50 border border-blue-200">
               <div class="text-[11px] font-semibold text-blue-700 uppercase">Daily Segments</div>
@@ -1394,7 +1394,7 @@
     </footer>
   </div>
 
-  <!-- External Application Logic Bundle -->
-  <script src="app.js"></script>
+  <!-- External Application Logic Bundle (with version tag to bypass stale browser cache) -->
+  <script src="app.js?v=3"></script>
 </body>
 </html>
