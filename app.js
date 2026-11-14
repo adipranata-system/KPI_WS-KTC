@@ -224,6 +224,13 @@ function clearUserSession() {
  * Navigation Tab Switcher
  */
 function switchAppTab(tabId) {
+  const session = getUserSession();
+  const roleUpper = String(session?.role || '').trim().toUpperCase();
+  if ((tabId === 'tab-population' || tabId === 'tab-report') && !['SUPERADMIN', 'PLANNER'].includes(roleUpper)) {
+    showToast('Access denied: This module is restricted to Planner and Superadmin roles.', 'error');
+    return;
+  }
+
   activeTabId = tabId;
 
   document.querySelectorAll('.app-tab-panel').forEach((panel) => {
@@ -408,26 +415,26 @@ const AuthModule = {
 
   /**
    * Role Permissions Matrix:
-   * - Superadmin: All tabs (including Executive Report) & all sites
-   * - Planner: Monitoring + Operational + Executive Report (locked to assigned Site_Access)
-   * - Admin: Monitoring + Operational (NO Executive Report tab, locked to assigned Site_Access)
+   * - Superadmin: All tabs (including Unit Population & Executive Report) & all sites
+   * - Planner: Monitoring + Operational + Unit Population + Executive Report (locked to assigned Site_Access)
+   * - Admin: Monitoring + Daily Operational Input only (NO Unit Population & NO Executive Report)
    * - Viewer: KPI Dashboard & KPI History only
    */
   applyRolePermissions(role) {
     const roleUpper = String(role || '').trim().toUpperCase();
     const adminMenus = document.querySelectorAll('.admin-only-menu');
-    const reportMenus = document.querySelectorAll('.report-only-menu');
+    const plannerMenus = document.querySelectorAll('.planner-only-menu');
 
     const canOperate = ['SUPERADMIN', 'PLANNER', 'ADMIN'].includes(roleUpper);
-    const canReport = ['SUPERADMIN', 'PLANNER'].includes(roleUpper);
+    const canPlanOrSuper = ['SUPERADMIN', 'PLANNER'].includes(roleUpper);
 
     adminMenus.forEach((el) => {
       if (canOperate) el.classList.remove('hidden');
       else el.classList.add('hidden');
     });
 
-    reportMenus.forEach((el) => {
-      if (canReport) el.classList.remove('hidden');
+    plannerMenus.forEach((el) => {
+      if (canPlanOrSuper) el.classList.remove('hidden');
       else el.classList.add('hidden');
     });
   },
@@ -1969,25 +1976,26 @@ const InputHmModule = {
       this.updateScheduleHeader();
       this.renderMonthlyCalendarStrip();
 
-      // Auto-populate active units (W) if date is blank so desktop keyboard entry starts immediately
-      if (this.operations.DAY.length === 0 && this.operations.NIGHT.length === 0) {
-        this.quickFillBothShifts(false);
-      } else {
-        this.renderShiftTable('DAY');
-        this.renderShiftTable('NIGHT');
-        this.updateLiveSummary();
-      }
+      // Keep shift tables blank when date has no saved records until Admin clicks Fill Units (W) or Auto-Fill
+      this.renderShiftTable('DAY');
+      this.renderShiftTable('NIGHT');
+      this.updateLiveSummary();
 
+      const hasExistingRows = this.operations.DAY.length > 0 || this.operations.NIGHT.length > 0;
       if (statusBox) {
-        statusBox.textContent = `Loaded ${dateVal} (${res.dayName || ''}). Press "=" in End HM for auto full shift, or Ctrl+S to save.`;
+        statusBox.textContent = hasExistingRows
+          ? `Loaded saved schedule for ${dateVal} (${res.dayName || ''}). Press "=" in End HM for auto full shift, or Ctrl+S to save.`
+          : `Date ${dateVal} (${res.dayName || ''}) is empty. Click "Fill Units (W)" or "Auto-Fill Active Units (Alt+W)" to populate fleet.`;
       }
-      setTimeout(() => {
-        const firstEnd = document.getElementById('hm-end-DAY-0');
-        if (firstEnd) {
-          firstEnd.focus();
-          firstEnd.select();
-        }
-      }, 50);
+      if (hasExistingRows) {
+        setTimeout(() => {
+          const firstEnd = document.getElementById('hm-end-DAY-0') || document.getElementById('hm-end-NIGHT-0');
+          if (firstEnd) {
+            firstEnd.focus();
+            firstEnd.select();
+          }
+        }, 50);
+      }
     } else if (statusBox) {
       statusBox.textContent = res.message || 'Failed to load daily operational data.';
     }
@@ -2098,6 +2106,13 @@ const InputHmModule = {
     this.updateLiveSummary();
     if (notify) {
       showToast(`Populated active working units (W) into ${shiftName} Shift.`, 'info');
+      setTimeout(() => {
+        const firstEnd = document.getElementById(`hm-end-${shiftName}-0`);
+        if (firstEnd) {
+          firstEnd.focus();
+          firstEnd.select();
+        }
+      }, 30);
     }
   },
 
@@ -2106,6 +2121,13 @@ const InputHmModule = {
     this.quickFillActiveUnits('NIGHT', false);
     if (notify) {
       showToast('Populated active working units (W) for both Day & Night Shifts.', 'info');
+      setTimeout(() => {
+        const firstEnd = document.getElementById('hm-end-DAY-0');
+        if (firstEnd) {
+          firstEnd.focus();
+          firstEnd.select();
+        }
+      }, 30);
     }
   },
 
@@ -2382,7 +2404,7 @@ const InputHmModule = {
 
     const list = this.operations[shiftName];
     if (list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-xs text-slate-400">No units listed. Click "+ Row" or "Fill Units (W)".</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-xs text-slate-400">No units populated yet. Click <strong class="text-slate-600">"Fill Units (W)"</strong> above or <strong class="text-slate-600">"Auto-Fill Active Units (Alt+W)"</strong> to start input.</td></tr>`;
       return;
     }
 
