@@ -3092,6 +3092,9 @@ const ReportModule = {
   analysisData: {
     source: 'SMART_ENGINE',
     summaryText: '',
+    bab2Analysis: '',
+    bab3Analysis: '',
+    bab4Conclusion: '',
     recommendations: []
   },
   trendChart: null,
@@ -3100,9 +3103,70 @@ const ReportModule = {
   init() {
     const startInput = document.getElementById('rep-start-date');
     const endInput = document.getElementById('rep-end-date');
+    const monthPicker = document.getElementById('rep-month-picker');
     if (startInput && endInput && (!startInput.value || !endInput.value)) {
       this.applyDatePreset('MTD', false);
     }
+    if (monthPicker && !monthPicker.value && startInput?.value) {
+      monthPicker.value = startInput.value.slice(0, 7);
+    }
+  },
+
+  applyMonthPicker(monthVal) {
+    if (!monthVal) return;
+    const [yStr, mStr] = monthVal.split('-');
+    const year = Number(yStr);
+    const month = Number(mStr);
+    const lastDay = new Date(year, month, 0).getDate();
+    const startInput = document.getElementById('rep-start-date');
+    const endInput = document.getElementById('rep-end-date');
+    if (startInput) startInput.value = `${yStr}-${mStr}-01`;
+    if (endInput) endInput.value = `${yStr}-${mStr}-${String(lastDay).padStart(2, '0')}`;
+    this.load();
+  },
+
+  toggleNarrativeEditor() {
+    const box = document.getElementById('rep-edit-narratives-box');
+    if (!box) return;
+    const isHidden = box.classList.contains('hidden');
+    if (isHidden) {
+      this.syncNarrativeEditorInputs();
+      box.classList.remove('hidden');
+    } else {
+      box.classList.add('hidden');
+    }
+  },
+
+  syncNarrativeEditorInputs() {
+    const map = [
+      ['edit-nar-bab1', this.analysisData.summaryText],
+      ['edit-nar-bab2', this.analysisData.bab2Analysis],
+      ['edit-nar-bab3', this.analysisData.bab3Analysis],
+      ['edit-nar-bab4', this.analysisData.bab4Conclusion]
+    ];
+    map.forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val || '';
+    });
+  },
+
+  onManualNarrativeEdit() {
+    this.analysisData.summaryText = document.getElementById('edit-nar-bab1')?.value || '';
+    this.analysisData.bab2Analysis = document.getElementById('edit-nar-bab2')?.value || '';
+    this.analysisData.bab3Analysis = document.getElementById('edit-nar-bab3')?.value || '';
+    this.analysisData.bab4Conclusion = document.getElementById('edit-nar-bab4')?.value || '';
+    this.analysisData.source = 'CUSTOM_EDITED';
+
+    const elBab1 = document.getElementById('rep-summary-text');
+    const elBab2 = document.getElementById('rep-bab2-text');
+    const elBab3 = document.getElementById('rep-bab3-text');
+    const elBab4 = document.getElementById('rep-bab4-text');
+    const srcTag = document.getElementById('rep-summary-source-tag');
+    if (elBab1) elBab1.textContent = this.analysisData.summaryText;
+    if (elBab2) elBab2.textContent = this.analysisData.bab2Analysis;
+    if (elBab3) elBab3.textContent = this.analysisData.bab3Analysis;
+    if (elBab4) elBab4.textContent = this.analysisData.bab4Conclusion;
+    if (srcTag) srcTag.textContent = 'Narasi Disesuaikan Manual';
   },
 
   setReportType(type) {
@@ -3141,6 +3205,7 @@ const ReportModule = {
   applyDatePreset(preset, triggerLoad = true) {
     const startInput = document.getElementById('rep-start-date');
     const endInput = document.getElementById('rep-end-date');
+    const monthPicker = document.getElementById('rep-month-picker');
     if (!startInput || !endInput) return;
 
     const now = new Date();
@@ -3159,6 +3224,10 @@ const ReportModule = {
       const lastLast = new Date(now.getFullYear(), now.getMonth(), 0);
       startInput.value = fmt(firstLast);
       endInput.value = fmt(lastLast);
+    }
+
+    if (monthPicker && startInput.value) {
+      monthPicker.value = startInput.value.slice(0, 7);
     }
 
     if (triggerLoad) this.load();
@@ -3199,6 +3268,7 @@ const ReportModule = {
     if (res.status === 'success') {
       this.kpiData = res;
       this.analysisData = this.buildLocalIndonesianAnalysis(res, startDate, endDate, model, this.reportType);
+      this.syncNarrativeEditorInputs();
       this.renderPreviewSheet();
       if (statusMsg) {
         statusMsg.textContent = `Executive report ready (${this.reportType === 'WEEKLY' ? 'Weekly Operational' : 'Monthly Management Detail'}).`;
@@ -3238,20 +3308,26 @@ const ReportModule = {
     }
 
     if (res.status === 'success' && res.summaryText) {
+      const localFallback = this.buildLocalIndonesianAnalysis(this.kpiData, startDate, endDate, model, this.reportType);
       this.analysisData = {
         source: res.source || 'GEMINI_AI',
         summaryText: res.summaryText,
-        recommendations: res.recommendations || []
+        bab2Analysis: res.bab2Analysis || localFallback.bab2Analysis,
+        bab3Analysis: res.bab3Analysis || localFallback.bab3Analysis,
+        bab4Conclusion: res.bab4Conclusion || localFallback.bab4Conclusion,
+        recommendations: res.recommendations || localFallback.recommendations
       };
+      this.syncNarrativeEditorInputs();
       this.renderPreviewSheet();
       showToast(
         res.source === 'GEMINI_AI'
-          ? 'Gemini AI Executive Analysis generated in Indonesian!'
-          : 'Smart Reliability Engine analysis updated.',
+          ? 'Gemini AI Chapter-by-Chapter Analysis generated!'
+          : 'Smart Reliability Engine chapter narratives updated.',
         'success'
       );
-      if (statusMsg) statusMsg.textContent = 'Executive analysis updated. Ready to download PDF.';
+      if (statusMsg) statusMsg.textContent = 'Chapter narratives updated (BAB I - IV). Ready to download PDF.';
     } else {
+      if (statusMsg) statusMsg.textContent = 'Executive analysis ready using Smart Reliability Engine.';
       showToast(res.message || 'Using Smart Rule Engine analysis.', 'warning');
     }
   },
@@ -3262,40 +3338,73 @@ const ReportModule = {
     const isWeekly = reportType === 'WEEKLY';
     const paOk = ov.pa >= target;
     const uaOk = ov.ua >= target;
+    const totalCal = Math.round((ov.wh + ov.bdUnsched + ov.bdSched + ov.rainHrs + ov.stbyHrs) * 10) / 10;
+    const whPct = totalCal > 0 ? ((ov.wh / totalCal) * 100).toFixed(1) : '0.0';
     const topComp = kpiRes.pareto && kpiRes.pareto.length > 0 ? kpiRes.pareto[0] : null;
+    const totParetoHrs = (kpiRes.pareto || []).reduce((acc, p) => acc + p.totalHours, 0);
     const lowestUnits = (kpiRes.byUnit || []).filter((u) => u.pa < target).sort((a, b) => a.pa - b.pa);
+    const modelsSorted = [...(kpiRes.byModel || [])].sort((a, b) => b.pa - a.pa);
     const openCount = (kpiRes.activeBreakdowns || []).length;
+    const mutCount = (kpiRes.rosterMutations || []).length;
 
     const scopeLabel = isWeekly
       ? `evaluasi operasional mingguan periode ${startDate} s/d ${endDate}`
       : `evaluasi bulanan manajemen periode ${startDate} s/d ${endDate}`;
 
-    const parts = [];
+    // BAB I: Ringkasan Eksekutif (Bahasa komunikatif & mudah dipahami orang awam)
+    const bab1Parts = [];
     if (paOk) {
-      parts.push(
-        `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi Armada' : 'Model ' + filterModel}), kesiapan mekanis armada site ${kpiRes.site} tercapai sangat baik dengan Physical Availability (PA) sebesar ${ov.pa.toFixed(2)}% dan Mechanical Availability (MA) ${ov.ma.toFixed(2)}% (melampaui target manajemen ${target}%).`
+      bab1Parts.push(
+        `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi On-Hired' : 'Model ' + filterModel}), tingkat kesiapan fisik armada site ${kpiRes.site} tercapai sangat baik dengan Physical Availability (PA) sebesar ${ov.pa.toFixed(2)}% dan ketangguhan mekanis (MA) ${ov.ma.toFixed(2)}% (melampaui standar target manajemen ${target}%).`
       );
     } else {
-      parts.push(
-        `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi Armada' : 'Model ' + filterModel}), pencapaian Physical Availability (PA) site ${kpiRes.site} berada pada angka ${ov.pa.toFixed(2)}% (selisih ${(ov.pa - target).toFixed(2)}% terhadap target ${target}%), dipengaruhi oleh Unscheduled Breakdown sebesar ${ov.bdUnsched} jam (${ov.freqUnsched} kejadian) dengan rata-rata waktu perbaikan (MTTR) ${ov.mttr.toFixed(2)} jam.`
+      bab1Parts.push(
+        `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi On-Hired' : 'Model ' + filterModel}), tingkat kesiapan fisik armada (PA) site ${kpiRes.site} tercatat ${ov.pa.toFixed(2)}% atau masih di bawah target ${target}% (selisih ${(ov.pa - target).toFixed(2)}%), terutama akibat kerusakan mendadak (Unscheduled BD) selama ${ov.bdUnsched} jam (${ov.freqUnsched} kali kejadian) dengan rata-rata waktu perbaikan (MTTR) ${ov.mttr.toFixed(2)} jam.`
+      );
+    }
+    bab1Parts.push(
+      `Dari total ${totalCal.toFixed(1)} jam jadwal kerja armada, unit beroperasi produktif selama ${ov.wh.toFixed(1)} jam (${whPct}%) dengan tingkat pemanfaatan unit siap pakai (UA) sebesar ${ov.ua.toFixed(2)}% dan rata-rata ketahanan unit bekerja sebelum mengalami kerusakan berikutnya (MTBR) selama ${ov.mtbr.toFixed(2)} jam.`
+    );
+
+    // BAB II: Penjelasan Tren & Hukum Pareto 80/20
+    const bab2Parts = [];
+    if (topComp && totParetoHrs > 0) {
+      const sharePct = ((topComp.totalHours / totParetoHrs) * 100).toFixed(1);
+      bab2Parts.push(
+        `Grafik tren harian di atas memperlihatkan pergerakan kestabilan kesiapan armada sepanjang bulan, sedangkan analisis Pareto mengidentifikasi kelompok kerusakan utama yang paling banyak menyita waktu perbaikan mekanik.`
+      );
+      bab2Parts.push(
+        `Kelompok komponen ${topComp.component} tercatat sebagai penyumbang kerusakan mendadak terbesar dengan total ${topComp.totalHours.toFixed(2)} jam atau menyumbang ${sharePct}% dari seluruh jam breakdown tidak terjadwal — sehingga pencegahan pada sistem ini menjadi prioritas utama peningkatan kesiapan armada.`
+      );
+    } else {
+      bab2Parts.push(
+        `Tren harian memperlihatkan kestabilan kesiapan mekanis armada terjaga konsisten sepanjang periode evaluasi tanpa adanya lonjakan kerusakan mendadak yang signifikan.`
       );
     }
 
-    if (!uaOk) {
-      parts.push(
-        `Dari sisi pemanfaatan unit siap operasi, Use of Availability (UA) tercatat ${ov.ua.toFixed(2)}% akibat akumulasi jam Standby (${ov.stbyHrs} jam) serta faktor cuaca/hujan (${ov.rainHrs} jam).`
-      );
-    } else {
-      parts.push(
-        `Pemanfaatan armada berjalan efektif dengan Use of Availability (UA) mencapai ${ov.ua.toFixed(2)}% dan jarak rata-rata antar kerusakan (MTBR) terjaga pada ${ov.mtbr.toFixed(2)} jam.`
-      );
+    // BAB III: Evaluasi Performa Model, Watchlist Unit & Audit Mutasi
+    const bab3Parts = [];
+    if (modelsSorted.length > 0) {
+      const bestM = modelsSorted[0];
+      const worstM = modelsSorted[modelsSorted.length - 1];
+      if (modelsSorted.length > 1) {
+        bab3Parts.push(
+          `Secara perbandingan antar-model, armada ${bestM.model} mencatatkan kesiapan fisik tertinggi dengan PA ${bestM.pa.toFixed(2)}%, sedangkan model ${worstM.model} berada pada PA ${worstM.pa.toFixed(2)}% dan memerlukan perhatian pemeliharaan lebih intensif.`
+        );
+      } else {
+        bab3Parts.push(
+          `Armada model ${bestM.model} mencatatkan rata-rata PA ${bestM.pa.toFixed(2)}% dengan efisiensi kecepatan perbaikan (MTTR) ${bestM.mttr.toFixed(2)} jam.`
+        );
+      }
     }
+    bab3Parts.push(
+      `Saat ini terdapat ${openCount} unit yang masih dalam proses perbaikan di workshop (belum RFU) serta ${lowestUnits.length} unit dengan pencapaian PA di bawah target ${target}%. Dari sisi tata kelola populasi kontrak, tercatat ${mutCount} mutasi perubahan status armada (On-Hired / Off-Hired) selama periode laporan ini.`
+    );
 
-    if (topComp) {
-      parts.push(
-        `Penyumbang kehilangan jam breakdown tidak terjadwal terbesar berasal dari kelompok komponen ${topComp.component} (${topComp.totalHours} jam).`
-      );
-    }
+    // BAB IV: Kesimpulan Manajemen
+    const bab4Conclusion = paOk && uaOk
+      ? `Secara keseluruhan performa kesiapan mekanis maupun pemanfaatan operasional armada site ${kpiRes.site} berada pada kategori SEHAT (memenuhi seluruh target utama manajemen), dengan fokus peningkatan ke depan pada pencegahan kerusakan berulang komponen dominan.`
+      : `Performa armada site ${kpiRes.site} memerlukan langkah korektif terukur pada percepatan penyelesaian unit breakdown aktif, penguatan jadwal preventive maintenance, serta sinergi operasional lapangan guna mengangkat kembali pencapaian PA dan UA di atas target ${target}%.`;
 
     const recs = [];
     if (topComp) {
@@ -3316,7 +3425,10 @@ const ReportModule = {
 
     return {
       source: 'SMART_ENGINE',
-      summaryText: parts.join(' '),
+      summaryText: bab1Parts.join(' '),
+      bab2Analysis: bab2Parts.join(' '),
+      bab3Analysis: bab3Parts.join(' '),
+      bab4Conclusion: bab4Conclusion,
       recommendations: recs
     };
   },
@@ -3346,6 +3458,29 @@ const ReportModule = {
     document.getElementById('rep-doc-period').textContent = `${startDate} s/d ${endDate}`;
     document.getElementById('rep-doc-printed-by').textContent = session?.fullName || session?.username || 'Planner';
     document.getElementById('rep-doc-printed-at').textContent = new Date().toLocaleString('id-ID');
+
+    // Toggle Monthly-only Beginner Guides & Chapter Narrative Boxes
+    const toggleMonthlyBox = (id, show) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (show) el.classList.remove('hidden');
+      else el.classList.add('hidden');
+    };
+    toggleMonthlyBox('rep-monthly-kpi-guide', !isWeekly);
+    toggleMonthlyBox('rep-monthly-time-table-wrap', !isWeekly);
+    toggleMonthlyBox('rep-monthly-pareto-wrap', !isWeekly);
+    toggleMonthlyBox('rep-monthly-bab2-box', !isWeekly);
+    toggleMonthlyBox('rep-monthly-bab3-box', !isWeekly);
+    toggleMonthlyBox('rep-monthly-daily-wrap', !isWeekly);
+    toggleMonthlyBox('rep-mutation-section', !isWeekly);
+    toggleMonthlyBox('rep-monthly-bab4-box', !isWeekly);
+
+    const actionTitle = document.getElementById('rep-action-plan-title');
+    if (actionTitle) {
+      actionTitle.textContent = isWeekly
+        ? '4.1 Rencana Tindak Lanjut Teknis (Action Plan):'
+        : '4.2 Rencana Tindak Lanjut Teknis (Action Plan):';
+    }
 
     // KPI Cards
     const setRepCard = (idVal, idSub, val, isPct = true) => {
@@ -3389,15 +3524,27 @@ const ReportModule = {
         .join('');
     }
 
-    // Executive Summary & Recommendations
+    // Chapter-by-Chapter Narratives & Recommendations
     const isAi = this.analysisData.source === 'GEMINI_AI';
+    const isCustom = this.analysisData.source === 'CUSTOM_EDITED';
     document.getElementById('rep-ai-badge').textContent = isAi
       ? 'Analysis Engine: Gemini AI (Active)'
+      : isCustom
+      ? 'Analysis Engine: Manual Custom Narrative'
       : 'Analysis Engine: Smart Rule Engine';
     document.getElementById('rep-summary-source-tag').textContent = isAi
       ? 'Analisa Otomatis Gemini AI'
+      : isCustom
+      ? 'Narasi Disesuaikan Manual'
       : 'Analisa Otomatis Reliabilitas';
     document.getElementById('rep-summary-text').textContent = this.analysisData.summaryText;
+
+    const elBab2 = document.getElementById('rep-bab2-text');
+    const elBab3 = document.getElementById('rep-bab3-text');
+    const elBab4 = document.getElementById('rep-bab4-text');
+    if (elBab2) elBab2.textContent = this.analysisData.bab2Analysis || '';
+    if (elBab3) elBab3.textContent = this.analysisData.bab3Analysis || '';
+    if (elBab4) elBab4.textContent = this.analysisData.bab4Conclusion || '';
 
     const recList = document.getElementById('rep-recommendations-list');
     recList.innerHTML = (this.analysisData.recommendations || []).map((r) => `<li>${r}</li>`).join('');
@@ -3406,44 +3553,34 @@ const ReportModule = {
     // Render Report Charts
     this.renderReportCharts(target);
 
-    // Monthly Detailed Time Distribution Table (Hidden in Weekly, Shown in Monthly)
-    const timeTableWrap = document.getElementById('rep-monthly-time-table-wrap');
+    // Monthly Detailed Time Distribution Table
     const tbodyTimeDetail = document.getElementById('rep-tbody-time-detail');
-    if (isWeekly) {
-      timeTableWrap?.classList.add('hidden');
-    } else {
-      timeTableWrap?.classList.remove('hidden');
-      if (tbodyTimeDetail) {
-        const timeRows = [
-          { cat: 'Working Hours (WH)', hrs: ov.wh, p: pct(ov.wh), desc: 'Jam produktif unit beroperasi di lapangan' },
-          { cat: 'Breakdown Unscheduled (USCH / ACD)', hrs: ov.bdUnsched, p: pct(ov.bdUnsched), desc: `Kerusakan mendadak (${ov.freqUnsched || 0} kejadian) — Faktor Plant` },
-          { cat: 'Breakdown Scheduled (SCH / SVC)', hrs: ov.bdSched, p: pct(ov.bdSched), desc: 'Perawatan berkala & servis terjadwal — Faktor Plant' },
-          { cat: 'Rain & Slippery', hrs: ov.rainHrs, p: pct(ov.rainHrs), desc: 'Berhenti operasi akibat cuaca hujan & jalan licin' },
-          { cat: 'Standby Ready', hrs: ov.stbyHrs, p: pct(ov.stbyHrs), desc: 'Unit ready namun menunggu alokasi operasi / operator' }
-        ];
-        tbodyTimeDetail.innerHTML = timeRows.map((tr) => `
-          <tr class="border-b border-slate-200">
-            <td class="px-2.5 py-1.5 font-semibold text-slate-800">${tr.cat}</td>
-            <td class="px-2.5 py-1.5 text-right font-bold">${tr.hrs.toFixed(1)} Jam</td>
-            <td class="px-2.5 py-1.5 text-right">${tr.p.toFixed(1)}%</td>
-            <td class="px-2.5 py-1.5 text-slate-600">${tr.desc}</td>
-          </tr>`).join('') + `
-          <tr class="bg-slate-900 text-white font-bold">
-            <td class="px-2.5 py-1.5 uppercase">TOTAL CALENDAR HOURS</td>
-            <td class="px-2.5 py-1.5 text-right">${totalCal.toFixed(1)} Jam</td>
-            <td class="px-2.5 py-1.5 text-right">100.0%</td>
-            <td class="px-2.5 py-1.5 font-normal text-slate-200">Akumulasi total kuota jam seluruh populasi unit On-Hired</td>
-          </tr>`;
-      }
+    if (!isWeekly && tbodyTimeDetail) {
+      const timeRows = [
+        { cat: 'Working Hours (WH)', hrs: ov.wh, p: pct(ov.wh), desc: 'Jam produktif unit beroperasi di lapangan' },
+        { cat: 'Breakdown Unscheduled (USCH / ACD)', hrs: ov.bdUnsched, p: pct(ov.bdUnsched), desc: `Kerusakan mendadak (${ov.freqUnsched || 0} kejadian) - Faktor Plant` },
+        { cat: 'Breakdown Scheduled (SCH / SVC)', hrs: ov.bdSched, p: pct(ov.bdSched), desc: 'Perawatan berkala & servis terjadwal - Faktor Plant' },
+        { cat: 'Rain & Slippery', hrs: ov.rainHrs, p: pct(ov.rainHrs), desc: 'Berhenti operasi akibat cuaca hujan & jalan licin' },
+        { cat: 'Standby Ready', hrs: ov.stbyHrs, p: pct(ov.stbyHrs), desc: 'Unit ready namun menunggu alokasi operasi / operator' }
+      ];
+      tbodyTimeDetail.innerHTML = timeRows.map((tr) => `
+        <tr class="border-b border-slate-200">
+          <td class="px-2.5 py-1.5 font-semibold text-slate-800">${tr.cat}</td>
+          <td class="px-2.5 py-1.5 text-right font-bold">${tr.hrs.toFixed(1)} Jam</td>
+          <td class="px-2.5 py-1.5 text-right">${tr.p.toFixed(1)}%</td>
+          <td class="px-2.5 py-1.5 text-slate-600">${tr.desc}</td>
+        </tr>`).join('') + `
+        <tr class="bg-slate-900 text-white font-bold">
+          <td class="px-2.5 py-1.5 uppercase">TOTAL CALENDAR HOURS</td>
+          <td class="px-2.5 py-1.5 text-right">${totalCal.toFixed(1)} Jam</td>
+          <td class="px-2.5 py-1.5 text-right">100.0%</td>
+          <td class="px-2.5 py-1.5 font-normal text-slate-200">Akumulasi total kuota jam seluruh populasi unit On-Hired</td>
+        </tr>`;
     }
 
-    // Monthly Detailed Pareto Table (Hidden in Weekly mode, Shown in Monthly Management Detail mode)
-    const paretoWrap = document.getElementById('rep-monthly-pareto-wrap');
+    // Monthly Detailed Pareto Table
     const tbodyPareto = document.getElementById('rep-tbody-pareto-detail');
-    if (isWeekly) {
-      paretoWrap?.classList.add('hidden');
-    } else {
-      paretoWrap?.classList.remove('hidden');
+    if (!isWeekly && tbodyPareto) {
       const paretoList = this.kpiData.pareto || [];
       const totParetoHrs = paretoList.reduce((acc, p) => acc + p.totalHours, 0);
       let cumPct = 0;
@@ -3483,8 +3620,9 @@ const ReportModule = {
             </tr>`;
         }).join('');
 
-    // 3.2 Model Summary Table
+    // 3.2 Model Summary Table + TOTAL / RATA-RATA Footer
     const byModel = this.kpiData.byModel || [];
+    const tfootModel = document.getElementById('rep-tfoot-model');
     document.getElementById('rep-tbody-model').innerHTML = byModel.length === 0
       ? `<tr><td colspan="10" class="px-3 py-3 text-center text-slate-400">Belum ada data pada periode evaluasi.</td></tr>`
       : byModel.map((m) => `
@@ -3501,35 +3639,79 @@ const ReportModule = {
             <td class="px-2.5 py-1.5 text-right">${m.mtbr.toFixed(2)}j</td>
           </tr>`).join('');
 
-    // Monthly Daily Performance Log Table (Hidden in Weekly, Shown in Monthly)
-    const dailyWrap = document.getElementById('rep-monthly-daily-wrap');
+    if (tfootModel) {
+      tfootModel.innerHTML = byModel.length === 0 ? '' : `
+        <tr>
+          <td class="px-2.5 py-1.5 uppercase">TOTAL / RATA-RATA ARMADA</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.wh.toFixed(1)}</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.bdUnsched.toFixed(1)}</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.bdSched.toFixed(1)}</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.stbyHrs.toFixed(1)}</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.pa.toFixed(2)}%</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.ma.toFixed(2)}%</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.ua.toFixed(2)}%</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.mttr.toFixed(2)}j</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.mtbr.toFixed(2)}j</td>
+        </tr>`;
+    }
+
+    // Monthly Daily Performance Log Table (Including MTBR + TOTAL / RATA-RATA Footer)
     const dailyBadge = document.getElementById('rep-daily-log-badge');
     const tbodyDailyLog = document.getElementById('rep-tbody-daily-log');
-    if (isWeekly) {
-      dailyWrap?.classList.add('hidden');
-    } else {
-      dailyWrap?.classList.remove('hidden');
+    const tfootDailyLog = document.getElementById('rep-tfoot-daily-log');
+    if (!isWeekly && tbodyDailyLog) {
       const dailyRows = this.kpiData.trend || [];
       if (dailyBadge) dailyBadge.textContent = `${dailyRows.length} Hari Tercatat`;
-      if (tbodyDailyLog) {
-        tbodyDailyLog.innerHTML = dailyRows.length === 0
-          ? `<tr><td colspan="13" class="px-3 py-3 text-center text-slate-400">Belum ada log harian pada periode ini.</td></tr>`
-          : dailyRows.map((d) => `
-              <tr class="border-b border-slate-200">
-                <td class="px-2 py-1.5 font-bold text-slate-900">${d.date}</td>
-                <td class="px-2 py-1.5 text-slate-600">${d.dayName || '-'}</td>
-                <td class="px-2 py-1.5 text-right">${d.unitCount ?? '-'}</td>
-                <td class="px-2 py-1.5 text-right">${d.calHrs !== undefined ? Number(d.calHrs).toFixed(1) : '-'}</td>
-                <td class="px-2 py-1.5 text-right font-semibold">${d.wh !== undefined ? Number(d.wh).toFixed(1) : '-'}</td>
-                <td class="px-2 py-1.5 text-right text-rose-700">${d.bdUnsched !== undefined ? Number(d.bdUnsched).toFixed(1) : '-'}</td>
-                <td class="px-2 py-1.5 text-right text-amber-700">${d.bdSched !== undefined ? Number(d.bdSched).toFixed(1) : '-'}</td>
-                <td class="px-2 py-1.5 text-right text-sky-700">${d.rainHrs !== undefined ? Number(d.rainHrs).toFixed(1) : '-'}</td>
-                <td class="px-2 py-1.5 text-right">${d.stbyHrs !== undefined ? Number(d.stbyHrs).toFixed(1) : '-'}</td>
-                <td class="px-2 py-1.5 text-right font-bold ${d.pa >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.pa).toFixed(2)}%</td>
-                <td class="px-2 py-1.5 text-right font-bold ${d.ma >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.ma).toFixed(2)}%</td>
-                <td class="px-2 py-1.5 text-right font-bold ${d.ua >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.ua).toFixed(2)}%</td>
-                <td class="px-2 py-1.5 text-right">${d.mttr !== undefined ? Number(d.mttr).toFixed(2) + 'j' : '-'}</td>
-              </tr>`).join('');
+
+      if (dailyRows.length === 0) {
+        tbodyDailyLog.innerHTML = `<tr><td colspan="14" class="px-3 py-3 text-center text-slate-400">Belum ada log harian pada periode ini.</td></tr>`;
+        if (tfootDailyLog) tfootDailyLog.innerHTML = '';
+      } else {
+        let sumCal = 0, sumWh = 0, sumUnsch = 0, sumSch = 0, sumRain = 0, sumStby = 0;
+        tbodyDailyLog.innerHTML = dailyRows.map((d) => {
+          sumCal += Number(d.calHrs) || 0;
+          sumWh += Number(d.wh) || 0;
+          sumUnsch += Number(d.bdUnsched) || 0;
+          sumSch += Number(d.bdSched) || 0;
+          sumRain += Number(d.rainHrs) || 0;
+          sumStby += Number(d.stbyHrs) || 0;
+
+          return `
+            <tr class="border-b border-slate-200">
+              <td class="px-2 py-1.5 font-bold text-slate-900">${d.date}</td>
+              <td class="px-2 py-1.5 text-slate-600">${d.dayName || '-'}</td>
+              <td class="px-2 py-1.5 text-right">${d.unitCount ?? '-'}</td>
+              <td class="px-2 py-1.5 text-right">${d.calHrs !== undefined ? Number(d.calHrs).toFixed(1) : '-'}</td>
+              <td class="px-2 py-1.5 text-right font-semibold">${d.wh !== undefined ? Number(d.wh).toFixed(1) : '-'}</td>
+              <td class="px-2 py-1.5 text-right text-rose-700">${d.bdUnsched !== undefined ? Number(d.bdUnsched).toFixed(1) : '-'}</td>
+              <td class="px-2 py-1.5 text-right text-amber-700">${d.bdSched !== undefined ? Number(d.bdSched).toFixed(1) : '-'}</td>
+              <td class="px-2 py-1.5 text-right text-sky-700">${d.rainHrs !== undefined ? Number(d.rainHrs).toFixed(1) : '-'}</td>
+              <td class="px-2 py-1.5 text-right">${d.stbyHrs !== undefined ? Number(d.stbyHrs).toFixed(1) : '-'}</td>
+              <td class="px-2 py-1.5 text-right font-bold ${d.pa >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.pa).toFixed(2)}%</td>
+              <td class="px-2 py-1.5 text-right font-bold ${d.ma >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.ma).toFixed(2)}%</td>
+              <td class="px-2 py-1.5 text-right font-bold ${d.ua >= target ? 'text-emerald-700' : 'text-rose-700'}">${Number(d.ua).toFixed(2)}%</td>
+              <td class="px-2 py-1.5 text-right">${d.mttr !== undefined ? Number(d.mttr).toFixed(2) + 'j' : '-'}</td>
+              <td class="px-2 py-1.5 text-right">${d.mtbr !== undefined ? Number(d.mtbr).toFixed(2) + 'j' : '-'}</td>
+            </tr>`;
+        }).join('');
+
+        if (tfootDailyLog) {
+          tfootDailyLog.innerHTML = `
+            <tr>
+              <td colspan="3" class="px-2 py-1.5 uppercase">TOTAL / RATA-RATA PERIODE</td>
+              <td class="px-2 py-1.5 text-right">${sumCal.toFixed(1)}</td>
+              <td class="px-2 py-1.5 text-right">${sumWh.toFixed(1)}</td>
+              <td class="px-2 py-1.5 text-right">${sumUnsch.toFixed(1)}</td>
+              <td class="px-2 py-1.5 text-right">${sumSch.toFixed(1)}</td>
+              <td class="px-2 py-1.5 text-right">${sumRain.toFixed(1)}</td>
+              <td class="px-2 py-1.5 text-right">${sumStby.toFixed(1)}</td>
+              <td class="px-2 py-1.5 text-right">${ov.pa.toFixed(2)}%</td>
+              <td class="px-2 py-1.5 text-right">${ov.ma.toFixed(2)}%</td>
+              <td class="px-2 py-1.5 text-right">${ov.ua.toFixed(2)}%</td>
+              <td class="px-2 py-1.5 text-right">${ov.mttr.toFixed(2)}j</td>
+              <td class="px-2 py-1.5 text-right">${ov.mtbr.toFixed(2)}j</td>
+            </tr>`;
+        }
       }
     }
 
@@ -3541,7 +3723,7 @@ const ReportModule = {
 
     document.getElementById('rep-unit-section-title').textContent = isWeekly
       ? '3.3 Watchlist Unit Prioritas (PA Di Bawah Target 85%)'
-      : '3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan — Urut PA Tertinggi ke Terendah)';
+      : '3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan - Urut PA Tertinggi ke Terendah)';
     document.getElementById('rep-unit-section-badge').textContent = isWeekly
       ? `${displayUnits.length} Unit Perlu Perhatian`
       : `Total ${displayUnits.length} Unit Dievaluasi`;
@@ -3736,8 +3918,7 @@ const ReportModule = {
   /**
    * Direct A4 Landscape Formal Paper PDF Generator (jsPDF + AutoTable)
    * - Weekly Mode: Concise 2-page Tactical Operational Report
-   * - Monthly Mode: Comprehensive Multi-page Management Audit Report
-   * - Compressed PDF output (~120-250 KB) with crisp JPEG chart snapshots
+   * - Monthly Mode: Comprehensive Multi-page Management Audit Report with Plain-Language AI Guides
    */
   async downloadPdf() {
     if (!this.kpiData) {
@@ -3765,6 +3946,35 @@ const ReportModule = {
       const pageH = doc.internal.pageSize.getHeight();  // 210 mm
       const margin = 12;
       const contentW = pageW - margin * 2;
+      const safeBottom = pageH - 13;
+
+      const sanitizePdfText = (str) => String(str || '').replace(/[\u2014\u2013]/g, '-');
+      const ensureSpace = (neededMm) => {
+        if (curY + neededMm > safeBottom) {
+          doc.addPage();
+          curY = 15;
+        }
+      };
+      const drawNarrativeCallout = (title, bodyText, fillRgb, strokeRgb, titleRgb) => {
+        const cleanBody = sanitizePdfText(bodyText || '-');
+        const lines = doc.splitTextToSize(cleanBody, contentW - 6);
+        const boxH = lines.length * 3.8 + 7.5;
+        ensureSpace(boxH + 3);
+        doc.setFillColor(fillRgb[0], fillRgb[1], fillRgb[2]);
+        doc.setDrawColor(strokeRgb[0], strokeRgb[1], strokeRgb[2]);
+        doc.roundedRect(margin, curY, contentW, boxH, 1.5, 1.5, 'FD');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.8);
+        doc.setTextColor(titleRgb[0], titleRgb[1], titleRgb[2]);
+        doc.text(sanitizePdfText(title), margin + 3, curY + 4.3);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.6);
+        doc.setTextColor(30, 41, 59);
+        doc.text(lines, margin + 3, curY + 8.3);
+        curY += boxH + 4;
+      };
 
       const session = getUserSession();
       const startDate = document.getElementById('rep-start-date')?.value || '-';
@@ -3821,7 +4031,39 @@ const ReportModule = {
       doc.setDrawColor(15, 23, 42);
       doc.setLineWidth(0.4);
       doc.line(margin, curY + 1.5, margin + contentW, curY + 1.5);
-      curY += 5;
+      curY += 4.5;
+
+      // Monthly Only: Plain-Language KPI Glossary Box for Non-Technical Readers
+      if (!isWeekly) {
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(margin, curY, contentW, 13.5, 1.2, 1.2, 'FD');
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(15, 23, 42);
+        doc.text('PANDUAN MEMBACA INDIKATOR KPI ARMADA:', margin + 2.5, curY + 3.8);
+
+        const guideItems = [
+          { k: 'PA (Physical Availability):', d: 'Kesiapan fisik unit tidak rusak.' },
+          { k: 'MA (Mechanical Availability):', d: 'Ketangguhan mekanis saat operasi.' },
+          { k: 'UA (Use of Availability):', d: 'Optimalisasi unit siap pakai.' },
+          { k: 'MTTR (Avg Repair Time):', d: 'Rata-rata jam perbaikan mekanik.' },
+          { k: 'MTBR (Avg Between BD):', d: 'Ketahanan jam antar kerusakan.' }
+        ];
+        const gColW = (contentW - 5) / 5;
+        guideItems.forEach((gi, idx) => {
+          const gx = margin + 2.5 + idx * gColW;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(6.5);
+          doc.setTextColor(30, 64, 175);
+          doc.text(gi.k, gx, curY + 7.8);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(71, 85, 105);
+          doc.text(gi.d, gx, curY + 11.2);
+        });
+        curY += 16;
+      }
 
       // 5 KPI Cards Row
       const cardW = (contentW - 12) / 5;
@@ -3837,32 +4079,32 @@ const ReportModule = {
         const cx = margin + idx * (cardW + 3);
         doc.setFillColor(248, 250, 252);
         doc.setDrawColor(203, 213, 225);
-        doc.roundedRect(cx, curY, cardW, 18, 1.5, 1.5, 'FD');
+        doc.roundedRect(cx, curY, cardW, 17, 1.5, 1.5, 'FD');
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(6.8);
+        doc.setFontSize(6.7);
         doc.setTextColor(100, 116, 139);
-        doc.text(c.title, cx + 2.5, curY + 4.5);
+        doc.text(c.title, cx + 2.5, curY + 4.3);
 
-        doc.setFontSize(12);
+        doc.setFontSize(11.5);
         doc.setTextColor(15, 23, 42);
-        doc.text(c.val, cx + 2.5, curY + 11.2);
+        doc.text(c.val, cx + 2.5, curY + 10.6);
 
-        doc.setFontSize(6.8);
+        doc.setFontSize(6.7);
         doc.setTextColor(c.ok ? 4 : 190, c.ok ? 120 : 18, c.ok ? 87 : 60);
-        doc.text(c.sub, cx + 2.5, curY + 15.8);
+        doc.text(c.sub, cx + 2.5, curY + 15);
       });
-      curY += 22;
+      curY += 20.5;
 
-      // 1.1 Time Distribution Bar
+      // 1.1 Time Distribution Bar + 5-Column Equal Legend (Never Wraps)
       const totalCal = Math.round((ov.wh + ov.bdUnsched + ov.bdSched + ov.rainHrs + ov.stbyHrs) * 10) / 10;
       const pct = (v) => (totalCal > 0 ? (v / totalCal) * 100 : 0);
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
+      doc.setFontSize(8.3);
       doc.setTextColor(30, 41, 59);
       doc.text(`1.1 Distribusi Alokasi Waktu Armada (Total Calendar: ${totalCal.toFixed(1)} Jam / 100%)`, margin, curY);
-      curY += 2.5;
+      curY += 2.2;
 
       const timeSegs = [
         { label: `WH: ${ov.wh.toFixed(1)}j (${pct(ov.wh).toFixed(1)}%)`, p: pct(ov.wh), rgb: [16, 185, 129] },
@@ -3877,22 +4119,28 @@ const ReportModule = {
         const w = (s.p / 100) * contentW;
         if (w > 0.3) {
           doc.setFillColor(s.rgb[0], s.rgb[1], s.rgb[2]);
-          doc.rect(barX, curY, w, 5.5, 'F');
+          doc.rect(barX, curY, w, 5, 'F');
           if (s.p >= 9) {
             doc.setTextColor(255, 255, 255);
-            doc.setFontSize(6.8);
-            doc.text(`${s.p.toFixed(1)}%`, barX + w / 2, curY + 3.8, { align: 'center' });
+            doc.setFontSize(6.6);
+            doc.text(`${s.p.toFixed(1)}%`, barX + w / 2, curY + 3.5, { align: 'center' });
           }
           barX += w;
         }
       });
-      curY += 8.5;
+      curY += 7.5;
 
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(51, 65, 85);
-      doc.text(timeSegs.map((s) => `• ${s.label}`).join('     '), margin, curY);
-      curY += 5;
+      const legColW = contentW / 5;
+      timeSegs.forEach((s, idx) => {
+        const lx = margin + idx * legColW;
+        doc.setFillColor(s.rgb[0], s.rgb[1], s.rgb[2]);
+        doc.rect(lx, curY - 2.3, 2.5, 2.5, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.1);
+        doc.setTextColor(51, 65, 85);
+        doc.text(s.label, lx + 3.8, curY);
+      });
+      curY += 4.5;
 
       // Monthly Only: Detailed Calendar Time Allocation Table on Page 1
       if (!isWeekly) {
@@ -3902,14 +4150,14 @@ const ReportModule = {
           head: [['Kategori Alokasi Waktu Kalender', 'Total Jam Aktual', 'Proporsi (%)', 'Keterangan Faktor Operasional / Teknis']],
           body: [
             ['Working Hours (WH)', `${ov.wh.toFixed(1)} Jam`, `${pct(ov.wh).toFixed(1)}%`, 'Jam produktif unit beroperasi di lapangan'],
-            ['Breakdown Unscheduled (USCH / ACD)', `${ov.bdUnsched.toFixed(1)} Jam`, `${pct(ov.bdUnsched).toFixed(1)}%`, `Kerusakan mendadak (${ov.freqUnsched || 0} kejadian) — Faktor Plant`],
-            ['Breakdown Scheduled (SCH / SVC)', `${ov.bdSched.toFixed(1)} Jam`, `${pct(ov.bdSched).toFixed(1)}%`, 'Perawatan berkala & servis terjadwal — Faktor Plant'],
+            ['Breakdown Unscheduled (USCH / ACD)', `${ov.bdUnsched.toFixed(1)} Jam`, `${pct(ov.bdUnsched).toFixed(1)}%`, `Kerusakan mendadak (${ov.freqUnsched || 0} kejadian) - Faktor Plant`],
+            ['Breakdown Scheduled (SCH / SVC)', `${ov.bdSched.toFixed(1)} Jam`, `${pct(ov.bdSched).toFixed(1)}%`, 'Perawatan berkala & servis terjadwal - Faktor Plant'],
             ['Rain & Slippery', `${ov.rainHrs.toFixed(1)} Jam`, `${pct(ov.rainHrs).toFixed(1)}%`, 'Berhenti operasi akibat cuaca hujan & jalan licin'],
             ['Standby Ready', `${ov.stbyHrs.toFixed(1)} Jam`, `${pct(ov.stbyHrs).toFixed(1)}%`, 'Unit ready namun menunggu alokasi operasi / operator']
           ],
           foot: [['TOTAL CALENDAR HOURS', `${totalCal.toFixed(1)} Jam`, '100.0%', 'Akumulasi total kuota jam seluruh populasi unit On-Hired']],
           theme: 'grid',
-          styles: { fontSize: 7.3, cellPadding: 1.6 },
+          styles: { fontSize: 7.1, cellPadding: 1.4 },
           headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
           footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
           columnStyles: {
@@ -3917,31 +4165,24 @@ const ReportModule = {
             2: { halign: 'right', cellWidth: 26 }
           }
         });
-        curY = doc.lastAutoTable.finalY + 5;
+        curY = doc.lastAutoTable.finalY + 4;
       }
 
       // 1.2 Executive Summary Narrative Box
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(30, 58, 138);
-      const engineTag = this.analysisData.source === 'GEMINI_AI' ? '[Analisa Gemini AI]' : '[Analisa Otomatis Reliabilitas]';
-      doc.text(`1.2 Ulasan Eksekutif (Executive Summary) ${engineTag}`, margin, curY);
-      curY += 2.5;
-
-      const summaryLines = doc.splitTextToSize(this.analysisData.summaryText || '-', contentW - 6);
-      const boxH = summaryLines.length * 4 + 4;
-      doc.setFillColor(239, 246, 255);
-      doc.setDrawColor(147, 197, 253);
-      doc.roundedRect(margin, curY, contentW, boxH, 1.5, 1.5, 'FD');
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8);
-      doc.setTextColor(30, 41, 59);
-      doc.text(summaryLines, margin + 3, curY + 4.5);
-      curY += boxH + 6;
+      const engineTag = this.analysisData.source === 'GEMINI_AI'
+        ? '[Analisa Gemini AI]'
+        : this.analysisData.source === 'CUSTOM_EDITED'
+        ? '[Narasi Manajemen]'
+        : '[Analisa Otomatis Reliabilitas]';
+      drawNarrativeCallout(
+        `1.2 Ulasan Eksekutif (Executive Summary) ${engineTag}`,
+        this.analysisData.summaryText,
+        [239, 246, 255],
+        [147, 197, 253],
+        [30, 58, 138]
+      );
 
       // --- BAB II. ANALISIS TREN & PARETO KOMPONEN ---
-      // Weekly fits BAB II on Page 1; Monthly gives BAB II a dedicated clean Page 2 with full Pareto table
       if (!isWeekly || curY > 132) {
         doc.addPage();
         curY = 15;
@@ -3961,7 +4202,7 @@ const ReportModule = {
         const paretoImg = paretoCanvas.toDataURL('image/jpeg', 0.85);
         const leftW = contentW * 0.62;
         const rightW = contentW * 0.36;
-        const chartH = isWeekly ? 42 : 52;
+        const chartH = isWeekly ? 42 : 48;
 
         doc.setFontSize(7.8);
         doc.text('Gambar 2.1 Tren Harian PA, MA & UA (%) vs Target 85%', margin, curY + 2);
@@ -3973,36 +4214,46 @@ const ReportModule = {
 
         doc.addImage(trendImg, 'JPEG', margin, curY + 3.5, leftW, chartH, undefined, 'FAST');
         doc.addImage(paretoImg, 'JPEG', margin + leftW + 5, curY + 3.5, rightW, chartH, undefined, 'FAST');
-        curY += chartH + 7;
+        curY += chartH + 6.5;
       }
 
-      // Monthly Detailed Pareto Table
-      if (!isWeekly && (this.kpiData.pareto || []).length > 0) {
-        const paretoList = this.kpiData.pareto.slice(0, 10);
-        const totPareto = paretoList.reduce((a, b) => a + b.totalHours, 0);
-        let cum = 0;
-        const pRows = paretoList.map((p, idx) => {
-          const share = totPareto > 0 ? (p.totalHours / totPareto) * 100 : 0;
-          cum = Math.min(100, cum + share);
-          return [`#${idx + 1}`, p.component, `${p.totalHours.toFixed(2)} Jam`, `${share.toFixed(1)}%`, `${cum.toFixed(1)}%`];
-        });
+      // Monthly Detailed Pareto Table + Plain-Language AI Explanation for BAB II
+      if (!isWeekly) {
+        if ((this.kpiData.pareto || []).length > 0) {
+          const paretoList = this.kpiData.pareto.slice(0, 10);
+          const totPareto = paretoList.reduce((a, b) => a + b.totalHours, 0);
+          let cum = 0;
+          const pRows = paretoList.map((p, idx) => {
+            const share = totPareto > 0 ? (p.totalHours / totPareto) * 100 : 0;
+            cum = Math.min(100, cum + share);
+            return [`#${idx + 1}`, sanitizePdfText(p.component), `${p.totalHours.toFixed(2)} Jam`, `${share.toFixed(1)}%`, `${cum.toFixed(1)}%`];
+          });
 
-        doc.autoTable({
-          startY: curY,
-          margin: { left: margin, right: margin },
-          head: [['Rank', 'Kelompok Komponen', 'Total Jam BD Unscheduled', 'Kontribusi (%)', 'Kumulatif (%)']],
-          body: pRows,
-          theme: 'grid',
-          styles: { fontSize: 7.5, cellPadding: 1.8 },
-          headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
-          columnStyles: {
-            0: { halign: 'center', cellWidth: 16 },
-            2: { halign: 'right', cellWidth: 45 },
-            3: { halign: 'right', cellWidth: 32 },
-            4: { halign: 'right', cellWidth: 32 }
-          }
-        });
-        curY = doc.lastAutoTable.finalY + 6;
+          doc.autoTable({
+            startY: curY,
+            margin: { left: margin, right: margin },
+            head: [['Rank', 'Kelompok Komponen', 'Total Jam BD Unscheduled', 'Kontribusi (%)', 'Kumulatif (%)']],
+            body: pRows,
+            theme: 'grid',
+            styles: { fontSize: 7.3, cellPadding: 1.5 },
+            headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+            columnStyles: {
+              0: { halign: 'center', cellWidth: 16 },
+              2: { halign: 'right', cellWidth: 45 },
+              3: { halign: 'right', cellWidth: 32 },
+              4: { halign: 'right', cellWidth: 32 }
+            }
+          });
+          curY = doc.lastAutoTable.finalY + 4;
+        }
+
+        drawNarrativeCallout(
+          '2.2 Interpretasi Tren Harian & Analisis Pareto (Hukum 80/20)',
+          this.analysisData.bab2Analysis,
+          [238, 242, 255],
+          [165, 180, 252],
+          [49, 46, 129]
+        );
       }
 
       // --- BAB III. EVALUASI PERFORMA ARMADA & STATUS BREAKDOWN ---
@@ -4013,9 +4264,22 @@ const ReportModule = {
       doc.setFontSize(10);
       doc.text('BAB III. EVALUASI PERFORMA ARMADA & STATUS BREAKDOWN AKTIF', margin, curY);
       doc.line(margin, curY + 1.5, margin + contentW, curY + 1.5);
-      curY += 5;
+      curY += 4.5;
+
+      // Monthly Only: Plain-Language AI Explanation for BAB III
+      if (!isWeekly) {
+        drawNarrativeCallout(
+          '3.0 Ringkasan Evaluasi Perbandingan Model, Unit Prioritas & Stabilitas Populasi',
+          this.analysisData.bab3Analysis,
+          [236, 253, 245],
+          [110, 231, 183],
+          [6, 95, 70]
+        );
+      }
 
       // 3.1 Active Breakdown Table
+      ensureSpace(26);
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
       doc.setTextColor(159, 18, 57);
       doc.text(`3.1 Status Unit Masih Breakdown / Belum RFU (${(this.kpiData.activeBreakdowns || []).length} Unit Down)`, margin, curY);
@@ -4023,7 +4287,7 @@ const ReportModule = {
 
       const activeRows = (this.kpiData.activeBreakdowns || []).map((b) => {
         const dur = DashboardModule.calculateDownDuration(b.startDate, b.timeIn);
-        return [b.unitId, b.model, `${b.startDate} (${b.timeIn})`, dur.text, b.code, b.location || '-', b.problem || '-'];
+        return [b.unitId, b.model, `${b.startDate} (${b.timeIn})`, dur.text, b.code, sanitizePdfText(b.location || '-'), sanitizePdfText(b.problem || '-')];
       });
 
       doc.autoTable({
@@ -4032,12 +4296,14 @@ const ReportModule = {
         head: [['Unit ID', 'Model', 'Waktu Masuk BD', 'Durasi Down', 'Code', 'Lokasi', 'Keterangan Kerusakan (Problem)']],
         body: activeRows.length > 0 ? activeRows : [['-', '-', '-', '-', '-', '-', 'Seluruh unit dalam status siap operasi (RFU).']],
         theme: 'grid',
-        styles: { fontSize: 7.3, cellPadding: 1.8 },
+        styles: { fontSize: 7.2, cellPadding: 1.6 },
         headStyles: { fillColor: [159, 18, 57], textColor: 255, fontStyle: 'bold' }
       });
-      curY = doc.lastAutoTable.finalY + 6;
+      curY = doc.lastAutoTable.finalY + 5;
 
-      // 3.2 Model Summary Table
+      // 3.2 Model Summary Table + TOTAL / RATA-RATA Footer + Status Color Highlighting
+      ensureSpace(28);
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
       doc.setTextColor(15, 23, 42);
       doc.text('3.2 Rekapitulasi Performa Per Model Armada', margin, curY);
@@ -4061,29 +4327,52 @@ const ReportModule = {
         margin: { left: margin, right: margin },
         head: [['Model Unit', 'WH (Jam)', 'BD Unsch', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR']],
         body: modelRows.length > 0 ? modelRows : [['-', '0', '0', '0', '0', '0%', '0%', '0%', '0j', '0j']],
+        foot: modelRows.length > 0 ? [[
+          'TOTAL / RATA-RATA',
+          ov.wh.toFixed(1),
+          ov.bdUnsched.toFixed(1),
+          ov.bdSched.toFixed(1),
+          ov.stbyHrs.toFixed(1),
+          `${ov.pa.toFixed(2)}%`,
+          `${ov.ma.toFixed(2)}%`,
+          `${ov.ua.toFixed(2)}%`,
+          `${ov.mttr.toFixed(2)}j`,
+          `${ov.mtbr.toFixed(2)}j`
+        ]] : undefined,
         theme: 'grid',
-        styles: { fontSize: 7.4, cellPadding: 1.8 },
+        styles: { fontSize: 7.3, cellPadding: 1.6 },
         headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+        footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
         columnStyles: {
           1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
           5: { halign: 'right', fontStyle: 'bold' }, 6: { halign: 'right', fontStyle: 'bold' },
           7: { halign: 'right', fontStyle: 'bold' }, 8: { halign: 'right' }, 9: { halign: 'right' }
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && [5, 6, 7].includes(data.column.index)) {
+            const num = parseFloat(String(data.cell.raw || '0'));
+            if (!isNaN(num)) {
+              data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
+            }
+          }
         }
       });
-      curY = doc.lastAutoTable.finalY + 6;
+      curY = doc.lastAutoTable.finalY + 5;
 
       // 3.3 Unit Table (Weekly = Watchlist PA < 85%, Monthly = Full Fleet Audit Sorted High PA -> Low PA)
+      ensureSpace(28);
       const allUnits = [...(this.kpiData.byUnit || [])];
       const unitList = isWeekly
         ? allUnits.filter((u) => u.pa < target).sort((a, b) => a.pa - b.pa)
         : allUnits.sort((a, b) => b.pa - a.pa || a.unitId.localeCompare(b.unitId));
 
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
       doc.setTextColor(15, 23, 42);
       doc.text(
         isWeekly
           ? `3.3 Watchlist Unit Prioritas (PA < ${target}%): ${unitList.length} Unit`
-          : `3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan — Urut PA Tertinggi ke Terendah): ${unitList.length} Unit`,
+          : `3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan - Urut PA Tertinggi ke Terendah): ${unitList.length} Unit`,
         margin,
         curY
       );
@@ -4110,65 +4399,125 @@ const ReportModule = {
         head: [['Unit ID', 'Model', 'WH (Jam)', 'BD Unsch', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR', 'Status']],
         body: unitRows.length > 0 ? unitRows : [['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', isWeekly ? 'SEMUA UNIT TERCAPAI' : 'NIHIL']],
         theme: 'grid',
-        styles: { fontSize: 7.2, cellPadding: 1.6 },
+        styles: { fontSize: 7.1, cellPadding: 1.5 },
         headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
         columnStyles: {
           2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
           6: { halign: 'right', fontStyle: 'bold' }, 7: { halign: 'right' }, 8: { halign: 'right' },
           9: { halign: 'right' }, 10: { halign: 'right' }, 11: { halign: 'center', fontStyle: 'bold' }
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body') {
+            if ([6, 7, 8].includes(data.column.index)) {
+              const num = parseFloat(String(data.cell.raw || '0'));
+              if (!isNaN(num)) {
+                data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
+              }
+            }
+            if (data.column.index === 11) {
+              const st = String(data.cell.raw || '');
+              if (st === 'BELOW') {
+                data.cell.styles.textColor = [190, 18, 60];
+                data.cell.styles.fillColor = [255, 241, 242];
+              } else if (st === 'TERCAPAI' || st === 'SEMUA UNIT TERCAPAI') {
+                data.cell.styles.textColor = [4, 120, 87];
+              }
+            }
+          }
         }
       });
-      curY = doc.lastAutoTable.finalY + 6;
+      curY = doc.lastAutoTable.finalY + 5;
 
-      // Monthly Only: 3.4 Daily Fleet Performance Log (Date 1 to End of Month)
+      // Monthly Only: 3.4 Daily Fleet Performance Log (With MTBR Column + TOTAL / RATA-RATA Footer)
       if (!isWeekly && (this.kpiData.trend || []).length > 0) {
+        ensureSpace(30);
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.5);
         doc.setTextColor(15, 23, 42);
         doc.text(`3.4 Log Performa Harian Armada (${this.kpiData.trend.length} Hari Evaluasi)`, margin, curY);
         curY += 2;
 
-        const dailyLogRows = this.kpiData.trend.map((d) => [
-          d.date,
-          d.dayName || '-',
-          d.unitCount !== undefined ? String(d.unitCount) : '-',
-          d.calHrs !== undefined ? Number(d.calHrs).toFixed(1) : '-',
-          d.wh !== undefined ? Number(d.wh).toFixed(1) : '-',
-          d.bdUnsched !== undefined ? Number(d.bdUnsched).toFixed(1) : '-',
-          d.bdSched !== undefined ? Number(d.bdSched).toFixed(1) : '-',
-          d.rainHrs !== undefined ? Number(d.rainHrs).toFixed(1) : '-',
-          d.stbyHrs !== undefined ? Number(d.stbyHrs).toFixed(1) : '-',
-          `${Number(d.pa).toFixed(2)}%`,
-          `${Number(d.ma).toFixed(2)}%`,
-          `${Number(d.ua).toFixed(2)}%`,
-          d.mttr !== undefined ? `${Number(d.mttr).toFixed(2)}j` : '-'
-        ]);
+        let sumCal = 0, sumWh = 0, sumUnsch = 0, sumSch = 0, sumRain = 0, sumStby = 0;
+        const dailyLogRows = this.kpiData.trend.map((d) => {
+          sumCal += Number(d.calHrs) || 0;
+          sumWh += Number(d.wh) || 0;
+          sumUnsch += Number(d.bdUnsched) || 0;
+          sumSch += Number(d.bdSched) || 0;
+          sumRain += Number(d.rainHrs) || 0;
+          sumStby += Number(d.stbyHrs) || 0;
+
+          return [
+            d.date,
+            d.dayName || '-',
+            d.unitCount !== undefined ? String(d.unitCount) : '-',
+            d.calHrs !== undefined ? Number(d.calHrs).toFixed(1) : '-',
+            d.wh !== undefined ? Number(d.wh).toFixed(1) : '-',
+            d.bdUnsched !== undefined ? Number(d.bdUnsched).toFixed(1) : '-',
+            d.bdSched !== undefined ? Number(d.bdSched).toFixed(1) : '-',
+            d.rainHrs !== undefined ? Number(d.rainHrs).toFixed(1) : '-',
+            d.stbyHrs !== undefined ? Number(d.stbyHrs).toFixed(1) : '-',
+            `${Number(d.pa).toFixed(2)}%`,
+            `${Number(d.ma).toFixed(2)}%`,
+            `${Number(d.ua).toFixed(2)}%`,
+            d.mttr !== undefined ? `${Number(d.mttr).toFixed(2)}j` : '-',
+            d.mtbr !== undefined ? `${Number(d.mtbr).toFixed(2)}j` : '-'
+          ];
+        });
 
         doc.autoTable({
           startY: curY,
           margin: { left: margin, right: margin },
-          head: [['Tanggal', 'Hari', 'Unit', 'Cal Hrs', 'WH', 'BD Unsch', 'BD Sch', 'Rain', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR']],
+          head: [['Tanggal', 'Hari', 'Unit', 'Cal Hrs', 'WH', 'BD Unsch', 'BD Sch', 'Rain', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR']],
           body: dailyLogRows,
+          foot: [[
+            'TOTAL / AVG',
+            '-',
+            '-',
+            sumCal.toFixed(1),
+            sumWh.toFixed(1),
+            sumUnsch.toFixed(1),
+            sumSch.toFixed(1),
+            sumRain.toFixed(1),
+            sumStby.toFixed(1),
+            `${ov.pa.toFixed(2)}%`,
+            `${ov.ma.toFixed(2)}%`,
+            `${ov.ua.toFixed(2)}%`,
+            `${ov.mttr.toFixed(2)}j`,
+            `${ov.mtbr.toFixed(2)}j`
+          ]],
           theme: 'grid',
-          styles: { fontSize: 7.0, cellPadding: 1.5 },
+          styles: { fontSize: 6.7, cellPadding: 1.3 },
           headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+          footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
           columnStyles: {
             2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
             6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' },
-            9: { halign: 'right', fontStyle: 'bold' }, 10: { halign: 'right' }, 11: { halign: 'right' }, 12: { halign: 'right' }
+            9: { halign: 'right', fontStyle: 'bold' }, 10: { halign: 'right' }, 11: { halign: 'right' },
+            12: { halign: 'right' }, 13: { halign: 'right' }
+          },
+          didParseCell: (data) => {
+            if (data.section === 'body' && [9, 10, 11].includes(data.column.index)) {
+              const num = parseFloat(String(data.cell.raw || '0'));
+              if (!isNaN(num)) {
+                data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
+              }
+            }
           }
         });
-        curY = doc.lastAutoTable.finalY + 6;
+        curY = doc.lastAutoTable.finalY + 5;
       }
 
-      // Monthly Only: 3.5 Fleet Roster Mutation Audit Table in PDF
+      // Monthly Only: 3.5 Fleet Roster Mutation Audit Table in PDF (With Page-Break Guard)
       if (!isWeekly) {
+        ensureSpace(28);
         const mutations = this.kpiData.rosterMutations || [];
+        doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.5);
         doc.setTextColor(146, 64, 14);
         doc.text(`3.5 Catatan Mutasi Status Armada / On-Hired <-> Off-Hired Audit Log (${mutations.length} Mutasi)`, margin, curY);
         curY += 2;
 
-        const mutRows = mutations.map((m) => [m.timestamp, m.unitId, m.actionType, m.username, m.detail]);
+        const mutRows = mutations.map((m) => [m.timestamp, m.unitId, m.actionType, m.username, sanitizePdfText(m.detail)]);
         doc.autoTable({
           startY: curY,
           margin: { left: margin, right: margin },
@@ -4178,30 +4527,40 @@ const ReportModule = {
           styles: { fontSize: 7.2, cellPadding: 1.6 },
           headStyles: { fillColor: [146, 64, 14], textColor: 255, fontStyle: 'bold' }
         });
-        curY = doc.lastAutoTable.finalY + 8;
+        curY = doc.lastAutoTable.finalY + 6;
       }
 
       // --- BAB IV. REKOMENDASI & LEMBAR PENGESAHAN ---
-      if (curY > pageH - 68) {
-        doc.addPage();
-        curY = 15;
-      }
+      ensureSpace(72);
 
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
       doc.text('BAB IV. KESIMPULAN, REKOMENDASI TINDAK LANJUT & PENGESAHAN', margin, curY);
       doc.line(margin, curY + 1.5, margin + contentW, curY + 1.5);
-      curY += 5;
+      curY += 4.5;
 
+      if (!isWeekly) {
+        drawNarrativeCallout(
+          '4.1 Kesimpulan Evaluasi Bulanan Manajemen',
+          this.analysisData.bab4Conclusion,
+          [241, 245, 249],
+          [148, 163, 184],
+          [15, 23, 42]
+        );
+      }
+
+      ensureSpace(58);
+      doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.2);
-      doc.text('4.1 Rencana Tindak Lanjut Teknis (Action Plan):', margin, curY);
+      doc.setTextColor(15, 23, 42);
+      doc.text(isWeekly ? '4.1 Rencana Tindak Lanjut Teknis (Action Plan):' : '4.2 Rencana Tindak Lanjut Teknis (Action Plan):', margin, curY);
       curY += 4;
 
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7.8);
       (this.analysisData.recommendations || []).forEach((rec, i) => {
-        const wrapped = doc.splitTextToSize(`${i + 1}. ${rec}`, contentW - 4);
+        const wrapped = doc.splitTextToSize(sanitizePdfText(`${i + 1}. ${rec}`), contentW - 4);
         doc.text(wrapped, margin + 2, curY);
         curY += wrapped.length * 3.8 + 1;
       });
@@ -4210,14 +4569,15 @@ const ReportModule = {
       if (customNotes) {
         curY += 1.5;
         doc.setFont('helvetica', 'bold');
-        const noteWrapped = doc.splitTextToSize(`Catatan Lapangan Khusus: ${customNotes}`, contentW - 4);
+        const noteWrapped = doc.splitTextToSize(sanitizePdfText(`Catatan Lapangan Khusus: ${customNotes}`), contentW - 4);
         doc.text(noteWrapped, margin + 2, curY);
         doc.setFont('helvetica', 'normal');
         curY += noteWrapped.length * 3.8 + 2;
       }
 
-      // 3 Signature Columns
-      curY = Math.max(curY + 6, pageH - 44);
+      // 3 Signature Columns (With Page-Break Guard)
+      ensureSpace(34);
+      curY = Math.max(curY + 5, pageH - 43);
       const colW = contentW / 3;
       const signCols = [
         { top: 'Dibuat Oleh (Prepared by),', role: 'Planner / Admin Plant', dept: 'Plant Department' },
@@ -4233,13 +4593,13 @@ const ReportModule = {
         doc.text(sc.top, centerX, curY, { align: 'center' });
 
         doc.setDrawColor(30, 41, 59);
-        doc.line(centerX - 28, curY + 18, centerX + 28, curY + 18);
-        doc.text(sc.role, centerX, curY + 22, { align: 'center' });
+        doc.line(centerX - 28, curY + 17, centerX + 28, curY + 17);
+        doc.text(sc.role, centerX, curY + 21, { align: 'center' });
 
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7);
         doc.setTextColor(100, 116, 139);
-        doc.text(sc.dept, centerX, curY + 25.5, { align: 'center' });
+        doc.text(sc.dept, centerX, curY + 24.5, { align: 'center' });
       });
 
       // Official Workshop System Footer & Page Numbering across ALL pages
@@ -4252,7 +4612,7 @@ const ReportModule = {
         doc.setFontSize(6.8);
         doc.setTextColor(100, 116, 139);
         doc.text(
-          'Generated by Machine Performance System (MPS) — Digital Fleet Reliability & KPI Intelligence developed at PT. KTC Coal Mining & Energy Workshop by Adi Pranata.',
+          'Generated by Machine Performance System (MPS) - Digital Fleet Reliability & KPI Intelligence developed at PT. KTC Coal Mining & Energy Workshop by Adi Pranata.',
           margin,
           pageH - 5
         );
@@ -4327,13 +4687,13 @@ function getDemoApiResponse(action, payload, session) {
         stbyHrs: 48.0
       },
       trend: [
-        { date: '2026-11-08', dayName: 'Sunday', unitCount: 3, calHrs: 60, wh: 49.0, bdUnsched: 4.0, bdSched: 2.0, rainHrs: 1.0, stbyHrs: 4.0, pa: 90.0, ma: 92.45, ua: 90.74, mttr: 2.0 },
-        { date: '2026-11-09', dayName: 'Monday', unitCount: 3, calHrs: 60, wh: 47.0, bdUnsched: 5.0, bdSched: 2.8, rainHrs: 1.2, stbyHrs: 4.0, pa: 87.0, ma: 90.38, ua: 90.04, mttr: 2.5 },
-        { date: '2026-11-10', dayName: 'Tuesday', unitCount: 3, calHrs: 60, wh: 50.0, bdUnsched: 3.2, bdSched: 2.0, rainHrs: 0.8, stbyHrs: 4.0, pa: 91.33, ma: 93.98, ua: 91.24, mttr: 1.6 },
-        { date: '2026-11-11', dayName: 'Wednesday', unitCount: 3, calHrs: 60, wh: 44.0, bdUnsched: 6.3, bdSched: 3.0, rainHrs: 2.0, stbyHrs: 4.7, pa: 84.5, ma: 87.48, ua: 86.79, mttr: 3.15 },
-        { date: '2026-11-12', dayName: 'Thursday', unitCount: 3, calHrs: 60, wh: 48.0, bdUnsched: 4.2, bdSched: 2.5, rainHrs: 1.0, stbyHrs: 4.3, pa: 88.83, ma: 91.95, ua: 90.06, mttr: 2.1 },
-        { date: '2026-11-13', dayName: 'Friday', unitCount: 3, calHrs: 57, wh: 46.0, bdUnsched: 3.7, bdSched: 2.0, rainHrs: 1.3, stbyHrs: 4.0, pa: 90.0, ma: 92.56, ua: 89.67, mttr: 1.85 },
-        { date: '2026-11-14', dayName: 'Saturday', unitCount: 3, calHrs: 60, wh: 46.5, bdUnsched: 4.9, bdSched: 3.0, rainHrs: 1.0, stbyHrs: 4.6, pa: 86.83, ma: 90.47, ua: 89.25, mttr: 2.45 }
+        { date: '2026-11-08', dayName: 'Sunday', unitCount: 3, calHrs: 60, wh: 49.0, bdUnsched: 4.0, bdSched: 2.0, rainHrs: 1.0, stbyHrs: 4.0, pa: 90.0, ma: 92.45, ua: 90.74, mttr: 2.0, mtbr: 24.5 },
+        { date: '2026-11-09', dayName: 'Monday', unitCount: 3, calHrs: 60, wh: 47.0, bdUnsched: 5.0, bdSched: 2.8, rainHrs: 1.2, stbyHrs: 4.0, pa: 87.0, ma: 90.38, ua: 90.04, mttr: 2.5, mtbr: 23.5 },
+        { date: '2026-11-10', dayName: 'Tuesday', unitCount: 3, calHrs: 60, wh: 50.0, bdUnsched: 3.2, bdSched: 2.0, rainHrs: 0.8, stbyHrs: 4.0, pa: 91.33, ma: 93.98, ua: 91.24, mttr: 1.6, mtbr: 25.0 },
+        { date: '2026-11-11', dayName: 'Wednesday', unitCount: 3, calHrs: 60, wh: 44.0, bdUnsched: 6.3, bdSched: 3.0, rainHrs: 2.0, stbyHrs: 4.7, pa: 84.5, ma: 87.48, ua: 86.79, mttr: 3.15, mtbr: 22.0 },
+        { date: '2026-11-12', dayName: 'Thursday', unitCount: 3, calHrs: 60, wh: 48.0, bdUnsched: 4.2, bdSched: 2.5, rainHrs: 1.0, stbyHrs: 4.3, pa: 88.83, ma: 91.95, ua: 90.06, mttr: 2.1, mtbr: 24.0 },
+        { date: '2026-11-13', dayName: 'Friday', unitCount: 3, calHrs: 57, wh: 46.0, bdUnsched: 3.7, bdSched: 2.0, rainHrs: 1.3, stbyHrs: 4.0, pa: 90.0, ma: 92.56, ua: 89.67, mttr: 1.85, mtbr: 23.0 },
+        { date: '2026-11-14', dayName: 'Saturday', unitCount: 3, calHrs: 60, wh: 46.5, bdUnsched: 4.9, bdSched: 3.0, rainHrs: 1.0, stbyHrs: 4.6, pa: 86.83, ma: 90.47, ua: 89.25, mttr: 2.45, mtbr: 23.25 }
       ],
       pareto: [
         { component: 'HYD - Hydraulic System', totalHours: 28.5 },
@@ -4385,21 +4745,21 @@ function getDemoApiResponse(action, payload, session) {
     const dt = payload.date || '2026-11-14';
     const parts = dt.split('-').map(Number);
     const dObj = new Date(parts[0], parts[1] - 1, parts[2]);
-    const isFri = dObj.getDay() === 5;
+  if (action === 'GENERATE_AI_REPORT') {
+    const startDate = payload.startDate || '2026-11-01';
+    const endDate = payload.endDate || '2026-11-14';
+    const model = payload.model || 'ALL';
+    const reportType = payload.reportType || 'MONTHLY';
+    const sampleKpi = getDemoApiResponse('GET_DASHBOARD_KPI', payload, session);
+    const localNarrative = ReportModule.buildLocalIndonesianAnalysis(sampleKpi, startDate, endDate, model, reportType);
     return {
       status: 'success',
-      site: site,
-      date: dt,
-      dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][dObj.getDay()],
-      isFriday: isFri,
-      shifts: {
-        DAY: { isWorking: true, standardHours: isFri ? 9 : 10, rainHours: 0 },
-        NIGHT: { isWorking: true, standardHours: 10, rainHours: 0 }
-      },
-      operations: { DAY: [], NIGHT: [] },
-      lastHmMap: { 'EX-1320': 14250.5, 'EX-1351': 11890.0, 'DT-4012': 22410.2 },
-      breakdownMap: { DAY: { 'EX-1351': { hours: 2.5, codes: ['USCH'] } }, NIGHT: {} },
-      monthlyStatus: { '2026-11-01': 'COMPLETE', '2026-11-02': 'COMPLETE', '2026-11-12': 'BD_ONLY' }
+      source: 'GEMINI_AI',
+      summaryText: localNarrative.summaryText,
+      bab2Analysis: localNarrative.bab2Analysis,
+      bab3Analysis: localNarrative.bab3Analysis,
+      bab4Conclusion: localNarrative.bab4Conclusion,
+      recommendations: localNarrative.recommendations
     };
   }
 
