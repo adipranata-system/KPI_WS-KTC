@@ -238,7 +238,8 @@ function switchAppTab(tabId) {
     InputHmModule.init();
     InputHmModule.loadDate();
   } else if (tabId === 'tab-population') {
-    PopulationModule.renderTable();
+    PopulationModule.init();
+    PopulationModule.loadMonth();
   } else if (tabId === 'tab-report') {
     ReportModule.init();
     ReportModule.load();
@@ -1867,717 +1868,532 @@ const UploadExcelModule = {
 };
 
 /* ============================================================================
- * 5. DAILY HM INPUT MODULE (DESKTOP KEYBOARD-FIRST GRID)
+ * 6. UNIT POPULATION REGISTRY & MONTHLY FLEET ROSTER LOCK MODULE
  * ============================================================================ */
-const InputHmModule = {
-  selectedDate: '',
-  isFriday: false,
-  lastHmMap: {},
-  breakdownMap: { DAY: {}, NIGHT: {} },
-  monthlyStatus: {},
-  shortcutsBound: false,
-  shifts: {
-    DAY: { isWorking: true, standardHours: 10, rainHours: 0 },
-    NIGHT: { isWorking: true, standardHours: 10, rainHours: 0 }
+const PopulationModule = {
+  selectedMonth: '',
+  rosterUnits: [],
+  auditLogs: [],
+  lockState: {
+    mode: 'GRACE_PERIOD',
+    isLocked: false,
+    label: 'Loading...',
+    description: ''
   },
-  operations: {
-    DAY: [],
-    NIGHT: []
-  },
+  isMaterialized: false,
+  inheritedFrom: '',
 
   init() {
-    const picker = document.getElementById('op-date-picker');
+    const picker = document.getElementById('pop-month-picker');
     if (picker && !picker.value) {
       const now = new Date();
-      picker.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      picker.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     }
-
-    if (!this.shortcutsBound) {
-      this.shortcutsBound = true;
-      document.addEventListener('keydown', (e) => {
-        if (activeTabId !== 'tab-input-hm') return;
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-          e.preventDefault();
-          this.saveAll();
-        } else if (e.altKey && e.key.toLowerCase() === 'w') {
-          e.preventDefault();
-          this.quickFillBothShifts();
-        } else if (e.altKey && e.key.toLowerCase() === 'd') {
-          e.preventDefault();
-          document.getElementById('hm-end-DAY-0')?.focus();
-        } else if (e.altKey && e.key.toLowerCase() === 'n') {
-          e.preventDefault();
-          document.getElementById('hm-end-NIGHT-0')?.focus();
-        }
-      });
-    }
+    this.selectedMonth = picker ? picker.value : '';
   },
 
-  shiftDateBy(deltaDays) {
-    const picker = document.getElementById('op-date-picker');
-    if (!picker || !picker.value) return;
-    const parts = picker.value.split('-').map(Number);
-    const dt = new Date(parts[0], parts[1] - 1, parts[2] + deltaDays);
-    picker.value = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-    this.loadDate();
-  },
-
-  selectCalendarDate(ymd) {
-    const picker = document.getElementById('op-date-picker');
-    if (picker) {
-      picker.value = ymd;
-      this.loadDate();
-    }
-  },
-
-  async loadDate() {
+  async loadMonth() {
     this.init();
-    const dateVal = document.getElementById('op-date-picker')?.value;
-    if (!dateVal) return;
+    const picker = document.getElementById('pop-month-picker');
+    const targetMonth = picker?.value || this.selectedMonth;
+    this.selectedMonth = targetMonth;
 
-    this.selectedDate = dateVal;
-    const statusBox = document.getElementById('op-status-msg');
-    if (statusBox) statusBox.textContent = `Loading operational schedule for ${dateVal}...`;
+    const statusBox = document.getElementById('pop-status-msg');
+    if (statusBox) {
+      statusBox.textContent = `Loading fleet roster snapshot for ${targetMonth}...`;
+      statusBox.className = 'text-xs text-blue-600 font-medium';
+    }
 
-    const res = await callBackendApi('GET_DAILY_OPERATION', {
+    const res = await callBackendApi('GET_MASTER_DATA', {
       site: AuthModule.currentSite,
-      date: dateVal
+      month: targetMonth
     });
 
     if (res.status === 'success') {
-      this.isFriday = Boolean(res.isFriday);
-      this.lastHmMap = res.lastHmMap || {};
-      this.breakdownMap = res.breakdownMap || { DAY: {}, NIGHT: {} };
-      this.monthlyStatus = res.monthlyStatus || {};
-      this.shifts = res.shifts || {
-        DAY: { isWorking: true, standardHours: this.isFriday ? 9 : 10, rainHours: 0 },
-        NIGHT: { isWorking: true, standardHours: 10, rainHours: 0 }
+      this.rosterUnits = (res.allSiteUnits || []).map((u) => ({
+        ...u,
+        _origStatus: u.status,
+        _origPending: Boolean(u.pendingOffHire),
+        _origReplaced: u.replacedUnitId || '',
+        _origReason: u.reason || ''
+      }));
+      this.auditLogs = res.auditLogs || [];
+      this.lockState = res.lockState || {
+        mode: 'GRACE_PERIOD',
+        isLocked: false,
+        label: 'Roster Unlocked',
+        description: ''
       };
+      this.isMaterialized = Boolean(res.isMaterialized);
+      this.inheritedFrom = res.inheritedFrom || '';
 
-      // Keep shift tables blank when date has no saved operational records until Fill Units (W) or Auto-Fill is clicked
-      const rawOps = res.operations || { DAY: [], NIGHT: [] };
-      this.operations = {
-        DAY: (rawOps.DAY || []).filter((r) => String(r.unitId || '').trim() !== ''),
-        NIGHT: (rawOps.NIGHT || []).filter((r) => String(r.unitId || '').trim() !== '')
-      };
-
-      this.updateScheduleHeader();
-      this.renderMonthlyCalendarStrip();
-      this.renderShiftTable('DAY');
-      this.renderShiftTable('NIGHT');
-      this.updateLiveSummary();
-
-      const hasExistingRows = this.operations.DAY.length > 0 || this.operations.NIGHT.length > 0;
-      if (statusBox) {
-        statusBox.textContent = hasExistingRows
-          ? `Loaded saved schedule for ${dateVal} (${res.dayName || ''}). Press "=" in End HM for auto full shift, or Ctrl+S to save.`
-          : `Date ${dateVal} (${res.dayName || ''}) is empty. Click "Fill Units (W)" or "Auto-Fill Active Units (Alt+W)" to populate fleet.`;
+      // Sinkronkan masterData bulan berjalan jika periode sama dengan bulan aktif
+      const now = new Date();
+      const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      if (targetMonth === curYM) {
+        AuthModule.masterData.units = res.units || [];
+        AuthModule.masterData.allSiteUnits = res.allSiteUnits || [];
+        AuthModule.populateModelFilters();
+        AuthModule.populateUnitDatalist();
       }
-      if (hasExistingRows) {
-        setTimeout(() => {
-          const firstEnd = document.getElementById('hm-end-DAY-0') || document.getElementById('hm-end-NIGHT-0');
-          if (firstEnd) {
-            firstEnd.focus();
-            firstEnd.select();
-          }
-        }, 50);
+
+      this.renderLockBanner();
+      this.renderTable();
+      this.renderAuditLogs();
+
+      if (statusBox) {
+        statusBox.textContent = `Loaded ${this.rosterUnits.length} fleet units for ${res.site} (${targetMonth}).`;
+        statusBox.className = 'text-xs text-emerald-600 font-semibold';
       }
     } else if (statusBox) {
-      statusBox.textContent = res.message || 'Failed to load daily operational data.';
+      statusBox.textContent = res.message || 'Failed to load monthly fleet roster.';
+      statusBox.className = 'text-xs text-rose-600 font-semibold';
     }
   },
 
-  updateScheduleHeader() {
-    const badge = document.getElementById('op-friday-badge');
-    const maxDay = document.getElementById('max-hrs-day');
-    const maxNight = document.getElementById('max-hrs-night');
-    const chkDay = document.getElementById('chk-day-working');
-    const chkNight = document.getElementById('chk-night-working');
-    const rainDay = document.getElementById('rain-day-hours');
-    const rainNight = document.getElementById('rain-night-hours');
+  renderLockBanner() {
+    const badge = document.getElementById('pop-lock-badge');
+    const info = document.getElementById('pop-inherited-info');
+    const banner = document.getElementById('pop-lock-banner');
+    const desc = document.getElementById('pop-lock-desc');
+    const btnCopy = document.getElementById('btn-copy-prev-roster');
+    const btnSave = document.getElementById('btn-save-bulk-status');
 
-    const dayQuota = this.isFriday ? 9 : 10;
+    const mode = this.lockState.mode || 'GRACE_PERIOD';
+
     if (badge) {
-      badge.textContent = this.isFriday
-        ? 'Friday Schedule: Day 9h + Night 10h = 19h'
-        : 'Standard Schedule: Day 10h + Night 10h = 20h';
-    }
-    if (maxDay) maxDay.textContent = `Quota: ${dayQuota}h`;
-    if (maxNight) maxNight.textContent = 'Quota: 10h';
-    if (chkDay) chkDay.checked = Boolean(this.shifts.DAY.isWorking);
-    if (chkNight) chkNight.checked = Boolean(this.shifts.NIGHT.isWorking);
-    if (rainDay) rainDay.value = this.shifts.DAY.rainHours || 0;
-    if (rainNight) rainNight.value = this.shifts.NIGHT.rainHours || 0;
-  },
-
-  renderMonthlyCalendarStrip() {
-    const strip = document.getElementById('op-monthly-calendar-strip');
-    if (!strip || !this.selectedDate) return;
-
-    const [year, month] = this.selectedDate.split('-').map(Number);
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const ymPrefix = `${year}-${String(month).padStart(2, '0')}`;
-
-    let html = '';
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dStr = `${ymPrefix}-${String(d).padStart(2, '0')}`;
-      const st = this.monthlyStatus[dStr] || 'EMPTY';
-      const isSelected = dStr === this.selectedDate;
-
-      let colorCls = 'bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200';
-      if (st === 'COMPLETE') {
-        colorCls = 'bg-emerald-500 text-white hover:bg-emerald-600 border-emerald-600';
-      } else if (st === 'BD_ONLY') {
-        colorCls = 'bg-amber-400 text-slate-900 hover:bg-amber-500 border-amber-500';
-      }
-
-      const ringCls = isSelected ? 'ring-2 ring-blue-600 ring-offset-1 font-extrabold' : 'font-semibold';
-      html += `<button type="button" onclick="InputHmModule.selectCalendarDate('${dStr}')" title="${dStr} (${st})"
-        class="w-7 h-7 rounded text-[11px] border transition ${colorCls} ${ringCls}">
-        ${String(d).padStart(2, '0')}
-      </button>`;
-    }
-    strip.innerHTML = html;
-  },
-
-  toggleShiftWorking(shiftName, isWorking) {
-    this.shifts[shiftName].isWorking = Boolean(isWorking);
-    this.renderShiftTable(shiftName);
-    this.updateLiveSummary();
-  },
-
-  updateRainHours(shiftName, val) {
-    const maxHrs = shiftName === 'DAY' && this.isFriday ? 9 : 10;
-    const clean = Math.min(maxHrs, Math.max(0, parseFloat(val) || 0));
-    this.shifts[shiftName].rainHours = clean;
-    this.updateLiveSummary();
-  },
-
-  getExpectedStartHm(shiftName, unitId) {
-    const cleanId = String(unitId || '').trim();
-    if (!cleanId) return null;
-
-    if (shiftName === 'NIGHT') {
-      const dayRow = (this.operations.DAY || []).find((r) => String(r.unitId || '').trim() === cleanId);
-      if (dayRow && dayRow.hmEnd !== '' && !isNaN(parseFloat(dayRow.hmEnd))) {
-        return parseFloat(dayRow.hmEnd);
-      }
+      badge.textContent = this.lockState.label || mode;
+      const badgeStyles = {
+        PLANNING: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-indigo-100 text-indigo-800 border border-indigo-200',
+        GRACE_PERIOD: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200',
+        LOCKED_MID_MONTH: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-amber-100 text-amber-900 border border-amber-300',
+        HISTORICAL_FROZEN: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-slate-200 text-slate-700 border border-slate-300'
+      };
+      badge.className = badgeStyles[mode] || badgeStyles.GRACE_PERIOD;
     }
 
-    if (this.lastHmMap[cleanId] !== undefined && this.lastHmMap[cleanId] !== null) {
-      return Number(this.lastHmMap[cleanId]);
+    if (info) {
+      info.textContent = this.isMaterialized
+        ? `Snapshot Saved (${this.selectedMonth})`
+        : `Draft Inherited from ${this.inheritedFrom || 'Previous Period'} (Not Yet Locked)`;
     }
-    return null;
-  },
 
-  quickFillActiveUnits(shiftName, notify = true) {
-    const activeW = (AuthModule.masterData.units || []).filter((u) => u.status === 'W');
-    const existingIds = new Set(this.operations[shiftName].map((r) => String(r.unitId || '').trim()));
+    if (banner && desc) {
+      desc.textContent = this.lockState.description || '';
+      banner.className = mode === 'LOCKED_MID_MONTH'
+        ? 'p-3 rounded-lg bg-amber-50/80 border border-amber-200 text-xs text-amber-950 flex items-start gap-2'
+        : 'p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2';
+    }
 
-    activeW.forEach((u) => {
-      if (!existingIds.has(u.unitId)) {
-        const expStart = this.getExpectedStartHm(shiftName, u.unitId);
-        this.operations[shiftName].push({
-          unitId: u.unitId,
-          model: u.model,
-          hmStart: expStart !== null ? expStart : '',
-          hmEnd: '',
-          wh: 0,
-          remarks: ''
-        });
-      }
-    });
-
-    this.renderShiftTable(shiftName);
-    this.updateLiveSummary();
-    if (notify) {
-      showToast(`Populated active working units (W) into ${shiftName} Shift.`, 'info');
-      setTimeout(() => {
-        const firstEnd = document.getElementById(`hm-end-${shiftName}-0`);
-        if (firstEnd) {
-          firstEnd.focus();
-          firstEnd.select();
-        }
-      }, 30);
+    if (btnCopy) {
+      btnCopy.disabled = Boolean(this.lockState.isLocked);
+    }
+    if (btnSave) {
+      btnSave.disabled = mode === 'HISTORICAL_FROZEN';
     }
   },
 
-  quickFillBothShifts(notify = true) {
-    this.quickFillActiveUnits('DAY', false);
-    this.quickFillActiveUnits('NIGHT', false);
-    if (notify) {
-      showToast('Populated active working units (W) for both Day & Night Shifts.', 'info');
-      setTimeout(() => {
-        const firstEnd = document.getElementById('hm-end-DAY-0');
-        if (firstEnd) {
-          firstEnd.focus();
-          firstEnd.select();
-        }
-      }, 30);
+  async pullFromMaster() {
+    const btn = document.getElementById('btn-pull-master');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
     }
-  },
 
-  addUnitRow(shiftName, autoFocus = false) {
-    if (!this.shifts[shiftName].isWorking) return;
-    const idx = this.operations[shiftName].length;
-    this.operations[shiftName].push({
-      unitId: '',
-      model: '',
-      hmStart: '',
-      hmEnd: '',
-      wh: 0,
-      remarks: ''
-    });
-    this.renderShiftTable(shiftName);
-    if (autoFocus) {
-      setTimeout(() => {
-        document.getElementById(`unit-input-${shiftName}-${idx}`)?.focus();
-      }, 20);
+    await this.loadMonth();
+
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Sync Roster';
     }
+    showToast(`Synced fleet roster for ${AuthModule.currentSite} (${this.selectedMonth}).`, 'success');
   },
 
-  removeUnitRow(shiftName, index) {
-    this.operations[shiftName].splice(index, 1);
-    this.renderShiftTable(shiftName);
-    this.updateLiveSummary();
-  },
-
-  onRowChange(shiftName, index, field, value) {
-    const row = this.operations[shiftName][index];
-    if (!row) return;
-
-    row[field] = value;
-
-    if (field === 'unitId') {
-      const cleanId = String(value).trim().toUpperCase();
-      row.unitId = cleanId;
-      const found = (AuthModule.masterData.units || []).find((u) => u.unitId.toUpperCase() === cleanId);
-      row.model = found ? found.model : '';
-
-      const expStart = this.getExpectedStartHm(shiftName, cleanId);
-      row.hmStart = expStart !== null ? expStart : '';
-      this.renderShiftTable(shiftName);
-      this.updateLiveSummary();
+  async copyPreviousRoster() {
+    if (this.lockState.isLocked) {
+      showToast('This roster period is locked and cannot be overwritten.', 'warning');
       return;
     }
 
-    if (shiftName === 'DAY' && field === 'hmEnd' && row.unitId) {
-      const nightIdx = this.operations.NIGHT.findIndex((r) => String(r.unitId || '').trim() === row.unitId);
-      if (nightIdx !== -1 && value !== '' && !isNaN(parseFloat(value))) {
-        this.operations.NIGHT[nightIdx].hmStart = parseFloat(value);
-        this.updateRowDisplayOnly('NIGHT', nightIdx);
-      }
+    const btn = document.getElementById('btn-copy-prev-roster');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Finalizing Roster...';
     }
 
-    this.updateRowDisplayOnly(shiftName, index);
-    this.updateLiveSummary();
-  },
-
-  handleGridKeydown(event, shiftName, index, field) {
-    const key = event.key;
-
-    // Shortcut '=' or 'F' in End HM = Auto-fill Full Shift Hours (minus BD hours) & jump to next row
-    if (field === 'hmEnd' && (key === '=' || key.toLowerCase() === 'f')) {
-      event.preventDefault();
-      const row = this.operations[shiftName][index];
-      const start = parseFloat(row?.hmStart);
-      if (!isNaN(start)) {
-        const maxHrs = shiftName === 'DAY' && this.isFriday ? 9 : 10;
-        const bdHrs = this.breakdownMap[shiftName]?.[row.unitId]?.hours || 0;
-        const fullQuota = Math.max(0, Math.round((maxHrs - bdHrs) * 100) / 100);
-        const targetEnd = Math.round((start + fullQuota) * 100) / 100;
-
-        const endEl = document.getElementById(`hm-end-${shiftName}-${index}`);
-        if (endEl) endEl.value = targetEnd;
-        this.onRowChange(shiftName, index, 'hmEnd', targetEnd);
-      }
-      this.focusNextGridRow(shiftName, index, 'hmEnd');
-      return;
-    }
-
-    if (key === 'Enter' || key === 'ArrowDown') {
-      event.preventDefault();
-      if (field === 'unitId') {
-        const startEl = document.getElementById(`hm-start-${shiftName}-${index}`);
-        const endEl = document.getElementById(`hm-end-${shiftName}-${index}`);
-        if (startEl && startEl.value !== '' && endEl) {
-          endEl.focus();
-          endEl.select();
-        } else if (startEl) {
-          startEl.focus();
-          startEl.select();
-        }
-      } else if (field === 'hmStart' && key === 'Enter') {
-        const endEl = document.getElementById(`hm-end-${shiftName}-${index}`);
-        if (endEl) {
-          endEl.focus();
-          endEl.select();
-        }
-      } else {
-        this.focusNextGridRow(shiftName, index, field);
-      }
-    } else if (key === 'ArrowUp') {
-      event.preventDefault();
-      this.focusPrevGridRow(shiftName, index, field);
-    }
-  },
-
-  focusNextGridRow(shiftName, index, field) {
-    const prefix = field === 'unitId' ? 'unit-input' : field === 'hmStart' ? 'hm-start' : 'hm-end';
-    const nextIdx = index + 1;
-    if (nextIdx < this.operations[shiftName].length) {
-      const nextEl = document.getElementById(`${prefix}-${shiftName}-${nextIdx}`);
-      if (nextEl) {
-        nextEl.focus();
-        if (nextEl.select) nextEl.select();
-      }
-    } else if (shiftName === 'DAY' && this.operations.NIGHT.length > 0) {
-      const firstNight = document.getElementById(`${prefix}-NIGHT-0`);
-      if (firstNight) {
-        firstNight.focus();
-        if (firstNight.select) firstNight.select();
-      }
-    }
-  },
-
-  focusPrevGridRow(shiftName, index, field) {
-    const prefix = field === 'unitId' ? 'unit-input' : field === 'hmStart' ? 'hm-start' : 'hm-end';
-    const prevIdx = index - 1;
-    if (prevIdx >= 0) {
-      const prevEl = document.getElementById(`${prefix}-${shiftName}-${prevIdx}`);
-      if (prevEl) {
-        prevEl.focus();
-        if (prevEl.select) prevEl.select();
-      }
-    } else if (shiftName === 'NIGHT' && this.operations.DAY.length > 0) {
-      const lastDayIdx = this.operations.DAY.length - 1;
-      const lastDay = document.getElementById(`${prefix}-DAY-${lastDayIdx}`);
-      if (lastDay) {
-        lastDay.focus();
-        if (lastDay.select) lastDay.select();
-      }
-    }
-  },
-
-  handleGridPaste(event, shiftName, startIdx, startField) {
-    const text = (event.clipboardData || window.clipboardData)?.getData('text');
-    if (!text || (!text.includes('\n') && !text.includes('\t'))) return;
-
-    event.preventDefault();
-    const lines = text.trim().split(/\r?\n/).map((l) => l.split('\t'));
-
-    lines.forEach((cols, offset) => {
-      const targetIdx = startIdx + offset;
-      while (this.operations[shiftName].length <= targetIdx) {
-        this.operations[shiftName].push({ unitId: '', model: '', hmStart: '', hmEnd: '', wh: 0, remarks: '' });
-      }
-
-      if (cols.length === 1) {
-        const num = parseFloat(cols[0].replace(',', '.'));
-        if (!isNaN(num)) {
-          this.operations[shiftName][targetIdx][startField] = num;
-        }
-      } else if (cols.length === 2) {
-        const s = parseFloat(cols[0].replace(',', '.'));
-        const e = parseFloat(cols[1].replace(',', '.'));
-        if (!isNaN(s)) this.operations[shiftName][targetIdx].hmStart = s;
-        if (!isNaN(e)) this.operations[shiftName][targetIdx].hmEnd = e;
-      } else if (cols.length >= 3) {
-        const uid = String(cols[0] || '').trim().toUpperCase();
-        const found = (AuthModule.masterData.units || []).find((u) => u.unitId.toUpperCase() === uid);
-        this.operations[shiftName][targetIdx].unitId = uid;
-        this.operations[shiftName][targetIdx].model = found ? found.model : '';
-        const s = parseFloat(cols[1].replace(',', '.'));
-        const e = parseFloat(cols[2].replace(',', '.'));
-        if (!isNaN(s)) this.operations[shiftName][targetIdx].hmStart = s;
-        if (!isNaN(e)) this.operations[shiftName][targetIdx].hmEnd = e;
-      }
+    const res = await callBackendApi('MANAGE_UNIT_POPULATION', {
+      mode: 'COPY_PREVIOUS_ROSTER',
+      site: AuthModule.currentSite,
+      month: this.selectedMonth
     });
 
-    this.renderShiftTable(shiftName);
-    this.updateLiveSummary();
-    showToast(`Pasted ${lines.length} rows into ${shiftName} Shift.`, 'info');
-  },
-
-  computeRowStatus(shiftName, row) {
-    const maxHrs = shiftName === 'DAY' && this.isFriday ? 9 : 10;
-    const start = parseFloat(row.hmStart);
-    const end = parseFloat(row.hmEnd);
-    const bdInfo = this.breakdownMap[shiftName]?.[row.unitId] || null;
-    const expStart = this.getExpectedStartHm(shiftName, row.unitId);
-
-    let bdTag = '';
-    if (bdInfo && bdInfo.hours > 0) {
-      bdTag = `<span class="px-1.5 py-0.5 bg-rose-100 text-rose-700 font-bold rounded text-[10px]">BD ${bdInfo.hours}h (${bdInfo.codes.join('/')})</span> `;
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Copy / Finalize from Previous Month';
     }
 
-    if (row.hmEnd === '' || isNaN(end)) {
-      row.wh = 0;
-      const hint = expStart !== null ? `Prev HM: ${expStart}` : 'Blank = Skip (Stby/BD)';
-      return {
-        whText: '0.0h',
-        whClass: 'text-slate-400',
-        statusHtml: `${bdTag}<span class="text-slate-400">${hint}</span>`
-      };
-    }
-
-    if (isNaN(start)) {
-      row.wh = 0;
-      return {
-        whText: '0.0h',
-        whClass: 'text-rose-600',
-        statusHtml: `${bdTag}<span class="text-rose-600 font-semibold">Start HM required!</span>`
-      };
-    }
-
-    const diff = Math.round((end - start) * 100) / 100;
-    row.wh = diff;
-
-    if (diff < 0) {
-      return {
-        whText: `${diff.toFixed(1)}h`,
-        whClass: 'text-rose-600',
-        statusHtml: `${bdTag}<span class="text-rose-600 font-semibold">End HM &lt; Start HM!</span>`
-      };
-    }
-
-    if (diff > maxHrs) {
-      return {
-        whText: `${diff.toFixed(1)}h`,
-        whClass: 'text-rose-600',
-        statusHtml: `${bdTag}<span class="text-rose-600 font-semibold">Exceeds ${maxHrs}h shift quota!</span>`
-      };
-    }
-
-    const rem = Math.round((maxHrs - diff) * 100) / 100;
-    const remText = rem > 0 ? `Rem ${rem}h (BD/Rain/Stby)` : 'Full Shift';
-    return {
-      whText: `${diff.toFixed(1)}h`,
-      whClass: 'text-emerald-700',
-      statusHtml: `${bdTag}<span class="text-slate-600">${remText}</span>`
-    };
-  },
-
-  updateRowDisplayOnly(shiftName, index) {
-    const row = this.operations[shiftName][index];
-    if (!row) return;
-    const info = this.computeRowStatus(shiftName, row);
-
-    const startInput = document.getElementById(`hm-start-${shiftName}-${index}`);
-    if (startInput && document.activeElement !== startInput) {
-      startInput.value = row.hmStart;
-    }
-
-    const whCell = document.getElementById(`wh-${shiftName}-${index}`);
-    const noteCell = document.getElementById(`note-${shiftName}-${index}`);
-    if (whCell) {
-      whCell.textContent = info.whText;
-      whCell.className = `px-2 py-1.5 text-right font-extrabold text-xs ${info.whClass}`;
-    }
-    if (noteCell) {
-      noteCell.innerHTML = info.statusHtml;
+    if (res.status === 'success') {
+      showToast(res.message, 'success');
+      await this.loadMonth();
+    } else {
+      showToast(res.message || 'Failed to copy previous roster.', 'error');
     }
   },
 
-  renderShiftTable(shiftName) {
-    const tbody = document.getElementById(`tbody-${shiftName.toLowerCase()}-op`);
+  renderTable() {
+    const tbody = document.getElementById('tbody-population-list');
+    const searchVal = String(document.getElementById('pop-search-input')?.value || '').trim().toLowerCase();
+    const statusFilter = document.getElementById('pop-status-filter')?.value || 'ALL';
+    const badge = document.getElementById('pop-total-badge');
     if (!tbody) return;
 
-    if (!this.shifts[shiftName].isWorking) {
-      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-xs text-slate-400">Shift marked as Non-Working.</td></tr>`;
+    const allUnits = this.rosterUnits || [];
+    const counts = { W: 0, SW: 0, OH: 0, S: 0 };
+    allUnits.forEach((u) => {
+      if (counts[u.status] !== undefined) counts[u.status] += 1;
+    });
+
+    document.getElementById('pop-count-w').textContent = counts.W;
+    document.getElementById('pop-count-sw').textContent = counts.SW;
+    document.getElementById('pop-count-oh').textContent = counts.OH;
+    document.getElementById('pop-count-s').textContent = counts.S;
+
+    const onHiredTotal = counts.W + counts.SW;
+    if (badge) {
+      badge.textContent = `${onHiredTotal} On-Hired / ${allUnits.length} Total (${AuthModule.currentSite})`;
+    }
+
+    const filtered = allUnits.filter((u) => {
+      if (statusFilter === 'ON_HIRED' && !['W', 'SW'].includes(u.status)) return false;
+      if (statusFilter === 'PENDING_OH' && !u.pendingOffHire) return false;
+      if (['W', 'SW', 'OH', 'S'].includes(statusFilter) && u.status !== statusFilter) return false;
+
+      if (searchVal) {
+        return (
+          u.unitId.toLowerCase().includes(searchVal) ||
+          u.model.toLowerCase().includes(searchVal) ||
+          u.brand.toLowerCase().includes(searchVal) ||
+          u.equipment.toLowerCase().includes(searchVal)
+        );
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-sm text-slate-400">No units match the current filter.</td></tr>`;
       return;
     }
 
-    const list = this.operations[shiftName];
-    if (list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-xs text-slate-400">No units populated yet. Click <strong class="text-slate-600">"Fill Units (W)"</strong> above or <strong class="text-slate-600">"Auto-Fill Active Units (Alt+W)"</strong> to start input.</td></tr>`;
-      return;
-    }
+    const mode = this.lockState.mode || 'GRACE_PERIOD';
+    const isMidMonthLocked = mode === 'LOCKED_MID_MONTH';
+    const isFrozen = mode === 'HISTORICAL_FROZEN';
 
-    tbody.innerHTML = list
-      .map((row, idx) => {
-        const info = this.computeRowStatus(shiftName, row);
+    const statusOptions = [
+      { val: 'W', label: 'W (Working - On-Hired)' },
+      { val: 'SW', label: 'SW (Standby Working - On-Hired)' },
+      { val: 'OH', label: 'OH (Off Hired - Excluded)' },
+      { val: 'S', label: 'S (Scrap / Demob)' }
+    ];
+
+    tbody.innerHTML = filtered
+      .map((u) => {
+        const isScrap = u.status === 'S';
+        const isOffHired = u.status === 'OH';
+        const isOnHired = ['W', 'SW'].includes(u.status);
+        const isModified =
+          u.status !== u._origStatus ||
+          Boolean(u.pendingOffHire) !== u._origPending ||
+          (u.replacedUnitId || '') !== u._origReplaced ||
+          (u.reason || '') !== u._origReason;
+
+        const rowCls = isModified
+          ? 'bg-blue-50/60'
+          : isScrap
+          ? 'bg-slate-50 text-slate-400'
+          : isOffHired
+          ? 'bg-amber-50/30 hover:bg-slate-50'
+          : 'hover:bg-slate-50';
+
+        const selectStyle = {
+          W: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+          SW: 'border-blue-300 bg-blue-50 text-blue-800',
+          OH: 'border-amber-300 bg-amber-50 text-amber-800',
+          S: 'border-rose-300 bg-rose-50 text-rose-700'
+        }[u.status] || 'border-slate-300 bg-white';
+
+        // Tentukan opsi dropdown sesuai aturan penguncian bulan
+        let allowedOptions = statusOptions;
+        let disableSelect = isFrozen;
+
+        if (isMidMonthLocked) {
+          if (isOnHired && u._origStatus && ['W', 'SW'].includes(u._origStatus)) {
+            // Unit On-Hired terkunci W/SW hingga akhir bulan
+            allowedOptions = statusOptions.filter((o) => ['W', 'SW'].includes(o.val));
+          } else if (isOnHired && !['W', 'SW'].includes(u._origStatus)) {
+            // Baru ditarik darurat dari OH -> terkunci W/SW
+            allowedOptions = statusOptions.filter((o) => ['W', 'SW'].includes(o.val));
+          } else {
+            // OH atau S tidak bisa diubah langsung lewat dropdown saat terkunci
+            disableSelect = true;
+          }
+        }
+
+        const opts = allowedOptions
+          .map((o) => `<option value="${o.val}" ${u.status === o.val ? 'selected' : ''}>${o.label}</option>`)
+          .join('');
+
+        // Kolom Governance & Catatan Mutasi
+        let govHtml = '';
+        if (u.pendingOffHire) {
+          govHtml += `<div class="inline-flex flex-wrap items-center gap-1.5">
+            <span class="px-2 py-0.5 text-[10px] font-extrabold bg-amber-500 text-slate-950 rounded">PENDING OFF-HIRE (Eff. 1st Next Month)</span>
+            ${!isFrozen ? `<button type="button" onclick="PopulationModule.cancelPendingOffHire('${u.unitId}')" class="text-[11px] font-bold text-rose-600 hover:underline">Cancel</button>` : ''}
+          </div>`;
+        } else if (isOnHired && !isFrozen) {
+          govHtml += `<button type="button" onclick="PopulationModule.openActionModal('${u.unitId}', 'PENDING_OH')"
+            class="px-2.5 py-1 text-[11px] font-semibold bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg transition">
+            Schedule Pending Off-Hire
+          </button>`;
+        } else if (isOffHired && isMidMonthLocked) {
+          govHtml += `<button type="button" onclick="PopulationModule.openActionModal('${u.unitId}', 'EMERGENCY_PULL_IN')"
+            class="px-2.5 py-1 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs transition">
+            &#9889; Emergency Pull-In (OH &rarr; W)
+          </button>`;
+        } else if (isScrap) {
+          govHtml += `<span class="text-[11px] text-slate-400 italic">Decommissioned / Excluded from KPI</span>`;
+        } else {
+          govHtml += `<span class="text-[11px] text-slate-400">Standby Yard / Long-Term BD (Excluded)</span>`;
+        }
+
+        if (u.replacedUnitId) {
+          govHtml += `<div class="text-[11px] font-bold text-indigo-700 mt-1">Replaces Unit: ${u.replacedUnitId}</div>`;
+        }
+        if (u.reason) {
+          govHtml += `<div class="text-[11px] text-slate-600 mt-0.5 max-w-md">${u.reason}</div>`;
+        }
+
         return `
-          <tr class="border-b border-slate-100 hover:bg-blue-50/30">
-            <td class="px-2 py-1.5 text-center text-[11px] font-semibold text-slate-400">${idx + 1}</td>
-            <td class="px-2 py-1.5">
-              <input type="text" id="unit-input-${shiftName}-${idx}" list="datalist-active-units"
-                value="${row.unitId || ''}" placeholder="Unit ID"
-                onchange="InputHmModule.onRowChange('${shiftName}', ${idx}, 'unitId', this.value)"
-                onkeydown="InputHmModule.handleGridKeydown(event, '${shiftName}', ${idx}, 'unitId')"
-                onpaste="InputHmModule.handleGridPaste(event, '${shiftName}', ${idx}, 'unitId')"
-                class="w-full px-2 py-1 text-xs font-bold uppercase border border-slate-300 rounded focus:outline-none focus:border-blue-600 focus:bg-blue-50/40" />
-              <div class="text-[10px] text-slate-400 truncate mt-0.5">${row.model || '-'}</div>
+          <tr class="border-b border-slate-100 text-xs ${rowCls}">
+            <td class="px-4 py-2 font-bold ${isScrap ? 'line-through' : 'text-slate-900'}">${u.unitId}</td>
+            <td class="px-4 py-2">${u.category || '-'}</td>
+            <td class="px-4 py-2">${u.equipment || '-'}</td>
+            <td class="px-4 py-2">${u.brand || '-'}</td>
+            <td class="px-4 py-2 font-medium">${u.model}</td>
+            <td class="px-4 py-2">
+              <select ${disableSelect ? 'disabled' : ''}
+                onchange="PopulationModule.onInlineStatusChange('${u.unitId}', this.value)"
+                class="px-2.5 py-1 text-xs font-semibold rounded border focus:outline-none disabled:opacity-75 ${selectStyle}">
+                ${opts}
+              </select>
             </td>
-            <td class="px-2 py-1.5">
-              <input type="number" id="hm-start-${shiftName}-${idx}" step="0.1"
-                value="${row.hmStart !== '' ? row.hmStart : ''}" placeholder="0.0"
-                oninput="InputHmModule.onRowChange('${shiftName}', ${idx}, 'hmStart', this.value)"
-                onkeydown="InputHmModule.handleGridKeydown(event, '${shiftName}', ${idx}, 'hmStart')"
-                onpaste="InputHmModule.handleGridPaste(event, '${shiftName}', ${idx}, 'hmStart')"
-                class="w-full px-2 py-1 text-xs font-mono text-right border border-slate-300 rounded focus:outline-none focus:border-blue-600 focus:bg-blue-50/40" />
-            </td>
-            <td class="px-2 py-1.5">
-              <input type="number" id="hm-end-${shiftName}-${idx}" step="0.1"
-                value="${row.hmEnd !== '' ? row.hmEnd : ''}" placeholder="="
-                oninput="InputHmModule.onRowChange('${shiftName}', ${idx}, 'hmEnd', this.value)"
-                onkeydown="InputHmModule.handleGridKeydown(event, '${shiftName}', ${idx}, 'hmEnd')"
-                onpaste="InputHmModule.handleGridPaste(event, '${shiftName}', ${idx}, 'hmEnd')"
-                class="w-full px-2 py-1 text-xs font-mono font-bold text-right border border-slate-300 rounded focus:outline-none focus:border-blue-600 focus:bg-blue-50/40" />
-            </td>
-            <td id="wh-${shiftName}-${idx}" class="px-2 py-1.5 text-right font-extrabold text-xs ${info.whClass}">
-              ${info.whText}
-            </td>
-            <td id="note-${shiftName}-${idx}" class="px-2 py-1.5 text-[11px] leading-tight">
-              ${info.statusHtml}
-            </td>
-            <td class="px-2 py-1.5 text-center">
-              <button type="button" tabindex="-1" onclick="InputHmModule.removeUnitRow('${shiftName}', ${idx})" title="Remove Row"
-                class="text-slate-400 hover:text-rose-600 font-bold text-xs px-1">
-                &times;
-              </button>
-            </td>
+            <td class="px-4 py-2">${govHtml}</td>
           </tr>`;
       })
       .join('');
   },
 
-  updateLiveSummary() {
-    const sumEl = document.getElementById('op-live-summary');
-    if (!sumEl) return;
-
-    const fleetCount = (AuthModule.masterData.units || []).length;
-    const dayWh = this.shifts.DAY.isWorking
-      ? this.operations.DAY.reduce((acc, r) => acc + (r.hmEnd !== '' && !isNaN(parseFloat(r.hmEnd)) ? Math.max(0, Number(r.wh) || 0) : 0), 0)
-      : 0;
-    const nightWh = this.shifts.NIGHT.isWorking
-      ? this.operations.NIGHT.reduce((acc, r) => acc + (r.hmEnd !== '' && !isNaN(parseFloat(r.hmEnd)) ? Math.max(0, Number(r.wh) || 0) : 0), 0)
-      : 0;
-
-    const totalWh = dayWh + nightWh;
-    const rainPerUnit = (this.shifts.DAY.isWorking ? Number(this.shifts.DAY.rainHours) || 0 : 0) +
-                        (this.shifts.NIGHT.isWorking ? Number(this.shifts.NIGHT.rainHours) || 0 : 0);
-    const estRainPop = rainPerUnit * fleetCount;
-
-    sumEl.textContent = `Active Fleet: ${fleetCount} Units | Day WH: ${dayWh.toFixed(1)}h | Night WH: ${nightWh.toFixed(1)}h | Total WH: ${totalWh.toFixed(1)}h | Est. Fleet Rain: ${estRainPop.toFixed(1)}h`;
+  onInlineStatusChange(unitId, newStatus) {
+    const target = this.rosterUnits.find((u) => u.unitId === unitId);
+    if (!target) return;
+    target.status = newStatus;
+    if (!['W', 'SW'].includes(newStatus)) {
+      target.pendingOffHire = false;
+    }
+    this.renderTable();
   },
 
-  exportCsv() {
-    if (!this.selectedDate) {
-      showToast('Select an operational date first.', 'warning');
-      return;
-    }
-
-    const btn = document.getElementById('btn-hm-export-csv');
-    const headers = ['Site', 'Operational_Date', 'Shift', 'Unit_ID', 'Model', 'Start_HM', 'End_HM', 'WH_Hrs', 'Shift_Rain_Hrs'];
-    const rows = [];
-
-    ['DAY', 'NIGHT'].forEach((sh) => {
-      const rain = this.shifts[sh].rainHours || 0;
-      (this.operations[sh] || []).forEach((r) => {
-        if (!r.unitId) return;
-        rows.push([
-          AuthModule.currentSite,
-          this.selectedDate,
-          sh,
-          r.unitId,
-          r.model,
-          r.hmStart,
-          r.hmEnd,
-          Number(r.wh || 0).toFixed(2),
-          rain
-        ]);
-      });
-    });
-
-    downloadCsvFile(`MPS_Daily_HM_${AuthModule.currentSite}_${this.selectedDate}.csv`, headers, rows, btn);
-    showToast('Daily HM input exported to CSV.', 'success');
+  cancelPendingOffHire(unitId) {
+    const target = this.rosterUnits.find((u) => u.unitId === unitId);
+    if (!target) return;
+    target.pendingOffHire = false;
+    target.reason = '';
+    this.renderTable();
+    showToast(`Pending Off-Hire cancelled for ${unitId}. Click "Save Roster Changes" to confirm.`, 'info');
   },
 
-  async saveAll() {
-    const btnSave = document.getElementById('btn-save-op');
-    const statusBox = document.getElementById('op-status-msg');
+  openActionModal(unitId, actionMode) {
+    const unit = this.rosterUnits.find((u) => u.unitId === unitId);
+    if (!unit) return;
 
-    if (!this.selectedDate) {
-      showToast('Please select an operational date first.', 'warning');
-      return;
-    }
+    const modal = document.getElementById('modal-roster-action');
+    const title = document.getElementById('modal-roster-title');
+    const subtitle = document.getElementById('modal-roster-subtitle');
+    const pullFields = document.getElementById('modal-roster-pull-fields');
+    const replacedSelect = document.getElementById('modal-roster-replaced-unit');
+    const reasonInput = document.getElementById('modal-roster-reason');
 
-    const cleanOps = { DAY: [], NIGHT: [] };
+    document.getElementById('modal-roster-unit-id').value = unitId;
+    document.getElementById('modal-roster-mode').value = actionMode;
+    document.getElementById('modal-roster-unit-label').textContent = `${unit.unitId} (${unit.model}) — Current: ${unit.status}`;
+    if (reasonInput) reasonInput.value = unit.reason || '';
 
-    for (const shiftName of ['DAY', 'NIGHT']) {
-      if (!this.shifts[shiftName].isWorking) continue;
-      const maxHrs = shiftName === 'DAY' && this.isFriday ? 9 : 10;
-      const seenUnits = new Set();
+    if (actionMode === 'PENDING_OH') {
+      if (title) title.textContent = 'Schedule Pending Off-Hire (Effective 1st Next Month)';
+      if (subtitle) subtitle.textContent = 'Unit remains On-Hired until end of current month to preserve honest KPI accountability.';
+      pullFields?.classList.add('hidden');
+    } else {
+      if (title) title.textContent = 'Emergency Pull-In Replacement (Off-Hired to On-Hired)';
+      if (subtitle) subtitle.textContent = 'Activated unit will be locked as On-Hired through the end of this month.';
+      pullFields?.classList.remove('hidden');
 
-      for (const row of this.operations[shiftName]) {
-        const uid = String(row.unitId || '').trim();
-        if (!uid) continue;
-
-        // Skip rows with blank End HM (treated automatically as Standby / Breakdown)
-        if (row.hmEnd === '' || row.hmEnd === null || row.hmEnd === undefined) continue;
-
-        if (seenUnits.has(uid)) {
-          const msg = `Duplicate unit ${uid} detected in ${shiftName} Shift.`;
-          if (statusBox) statusBox.textContent = msg;
-          showToast(msg, 'error');
-          return;
-        }
-        seenUnits.add(uid);
-
-        const start = parseFloat(row.hmStart);
-        const end = parseFloat(row.hmEnd);
-        if (isNaN(start) || isNaN(end) || end < start) {
-          const msg = `Invalid HM reading on unit ${uid} (${shiftName} Shift).`;
-          if (statusBox) statusBox.textContent = msg;
-          showToast(msg, 'error');
-          return;
-        }
-
-        const diff = Math.round((end - start) * 100) / 100;
-        if (diff > maxHrs) {
-          const msg = `Unit ${uid} (${shiftName} Shift) WH (${diff}h) exceeds ${maxHrs}h shift quota.`;
-          if (statusBox) statusBox.textContent = msg;
-          showToast(msg, 'error');
-          return;
-        }
-
-        cleanOps[shiftName].push({
-          unitId: uid,
-          model: row.model,
-          hmStart: start,
-          hmEnd: end,
-          wh: diff,
-          remarks: row.remarks || ''
-        });
+      if (replacedSelect) {
+        const onHiredUnits = this.rosterUnits.filter((u) => ['W', 'SW'].includes(u.status) && u.unitId !== unitId);
+        replacedSelect.innerHTML = ['<option value="">-- Select Broken On-Hired Unit Being Replaced --</option>']
+          .concat(onHiredUnits.map((u) => `<option value="${u.unitId}">${u.unitId} (${u.model} - ${u.status})</option>`))
+          .join('');
       }
     }
 
-    if (btnSave) {
-      btnSave.disabled = true;
-      btnSave.textContent = 'Saving & Recalculating KPI...';
+    modal?.classList.remove('hidden');
+  },
+
+  closeActionModal() {
+    document.getElementById('modal-roster-action')?.classList.add('hidden');
+  },
+
+  async submitActionModal() {
+    const unitId = document.getElementById('modal-roster-unit-id')?.value;
+    const actionMode = document.getElementById('modal-roster-mode')?.value;
+    const reason = String(document.getElementById('modal-roster-reason')?.value || '').trim();
+    const target = this.rosterUnits.find((u) => u.unitId === unitId);
+
+    if (!target) return;
+    if (!reason) {
+      showToast('Technical justification / WO reference is required.', 'error');
+      return;
     }
 
-    const res = await callBackendApi('SAVE_DAILY_OPERATION', {
+    if (actionMode === 'PENDING_OH') {
+      target.pendingOffHire = true;
+      target.reason = reason;
+    } else if (actionMode === 'EMERGENCY_PULL_IN') {
+      const targetStatus = document.getElementById('modal-roster-target-status')?.value || 'W';
+      const replacedUnitId = document.getElementById('modal-roster-replaced-unit')?.value || '';
+      if (!replacedUnitId) {
+        showToast('Please select the On-Hired Unit ID being replaced.', 'error');
+        return;
+      }
+      target.status = targetStatus;
+      target.replacedUnitId = replacedUnitId;
+      target.reason = reason;
+    }
+
+    this.closeActionModal();
+    this.renderTable();
+    await this.saveBulkStatus(true);
+  },
+
+  renderAuditLogs() {
+    const tbody = document.getElementById('tbody-pop-audit-logs');
+    const badge = document.getElementById('pop-audit-count');
+    if (!tbody) return;
+
+    const logs = this.auditLogs || [];
+    if (badge) badge.textContent = `${logs.length} Logs`;
+
+    if (logs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-5 text-center text-xs text-slate-400">No roster mutations recorded for period ${this.selectedMonth}.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = logs
+      .map((l) => {
+        const badgeCls = {
+          EMERGENCY_PULL_IN: 'bg-indigo-100 text-indigo-800',
+          PENDING_OFF_HIRE: 'bg-amber-100 text-amber-900',
+          CANCEL_PENDING_OH: 'bg-slate-200 text-slate-700',
+          COPY_ROSTER: 'bg-emerald-100 text-emerald-800'
+        }[l.actionType] || 'bg-blue-100 text-blue-800';
+
+        return `
+          <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
+            <td class="px-3 py-2 font-mono text-[11px] text-slate-600 whitespace-nowrap">${l.timestamp}</td>
+            <td class="px-3 py-2 font-semibold text-slate-800">${l.username}</td>
+            <td class="px-3 py-2 font-bold text-slate-900">${l.unitId}</td>
+            <td class="px-3 py-2"><span class="px-2 py-0.5 text-[10px] font-bold rounded ${badgeCls}">${l.actionType}</span></td>
+            <td class="px-3 py-2 text-slate-700">${l.detail}</td>
+          </tr>`;
+      })
+      .join('');
+  },
+
+  exportCsv() {
+    const allUnits = this.rosterUnits || [];
+    if (allUnits.length === 0) {
+      showToast('No fleet roster records to export.', 'warning');
+      return;
+    }
+
+    const btn = document.getElementById('btn-pop-export-csv');
+    const headers = ['Site', 'Roster_Month', 'Unit_ID', 'Category', 'Equipment', 'Brand', 'Model', 'Roster_Status', 'On_Hired_Flag', 'Pending_Off_Hire', 'Replaced_Unit_ID', 'Technical_Reason'];
+    const rows = allUnits.map((u) => [
+      AuthModule.currentSite,
+      this.selectedMonth,
+      u.unitId,
+      u.category,
+      u.equipment,
+      u.brand,
+      u.model,
+      u.status,
+      ['W', 'SW'].includes(u.status) ? 'ON_HIRED' : 'OFF_HIRED',
+      u.pendingOffHire ? 'YES' : 'NO',
+      u.replacedUnitId || '',
+      u.reason || ''
+    ]);
+    downloadCsvFile(`MPS_Monthly_Roster_${AuthModule.currentSite}_${this.selectedMonth}.csv`, headers, rows, btn);
+    showToast('Monthly fleet roster exported to CSV.', 'success');
+  },
+
+  async saveBulkStatus(forceSave = false) {
+    if (this.lockState.mode === 'HISTORICAL_FROZEN') {
+      showToast('Historical roster period is permanently locked.', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('btn-save-bulk-status');
+    const hasChanges = this.rosterUnits.some(
+      (u) =>
+        u.status !== u._origStatus ||
+        Boolean(u.pendingOffHire) !== u._origPending ||
+        (u.replacedUnitId || '') !== u._origReplaced ||
+        (u.reason || '') !== u._origReason
+    );
+
+    if (!hasChanges && !forceSave && this.isMaterialized) {
+      showToast('No roster changes detected.', 'warning');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Saving Roster...';
+    }
+
+    const payloadUnits = this.rosterUnits.map((u) => ({
+      unitId: u.unitId,
+      status: u.status,
+      pendingOffHire: Boolean(u.pendingOffHire),
+      replacedUnitId: u.replacedUnitId || '',
+      reason: u.reason || ''
+    }));
+
+    const res = await callBackendApi('MANAGE_UNIT_POPULATION', {
+      mode: 'SAVE_MONTHLY_ROSTER',
       site: AuthModule.currentSite,
-      date: this.selectedDate,
-      shifts: this.shifts,
-      operations: cleanOps
+      month: this.selectedMonth,
+      units: payloadUnits
     });
 
-    if (btnSave) {
-      btnSave.disabled = false;
-      btnSave.textContent = 'Save Daily Operational Data (Ctrl+S)';
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Save Roster Changes';
     }
 
     if (res.status === 'success') {
-      this.monthlyStatus[this.selectedDate] = 'COMPLETE';
-      this.renderMonthlyCalendarStrip();
-      if (statusBox) statusBox.textContent = res.message;
       showToast(res.message, 'success');
+      await this.loadMonth();
     } else {
-      if (statusBox) statusBox.textContent = res.message || 'Failed to save daily operational data.';
-      showToast(res.message || 'Failed to save data.', 'error');
+      showToast(res.message || 'Failed to save monthly fleet roster.', 'error');
     }
   }
 };
@@ -3173,54 +2989,23 @@ const ReportModule = {
               <td class="px-2.5 py-1.5 text-center font-bold ${isPass ? 'text-emerald-700' : 'text-rose-700'}">${isPass ? 'TERCAPAI' : 'BELOW'}</td>
             </tr>`;
         }).join('');
-  },
 
-  renderReportCharts(target) {
-    if (typeof Chart === 'undefined' || !this.kpiData) return;
-
-    const cTrend = document.getElementById('rep-chart-trend');
-    const cPareto = document.getElementById('rep-chart-pareto');
-    if (this.trendChart) this.trendChart.destroy();
-    if (this.paretoChart) this.paretoChart.destroy();
-
-    const trendList = this.kpiData.trend || [];
-    if (cTrend) {
-      this.trendChart = new Chart(cTrend, {
-        type: 'line',
-        data: {
-          labels: trendList.map((t) => t.date.slice(5)),
-          datasets: [
-            { label: 'PA (%)', data: trendList.map((t) => t.pa), borderColor: '#1d4ed8', borderWidth: 2, tension: 0.2 },
-            { label: 'MA (%)', data: trendList.map((t) => t.ma), borderColor: '#047857', borderWidth: 2, tension: 0.2 },
-            { label: 'UA (%)', data: trendList.map((t) => t.ua), borderColor: '#b45309', borderWidth: 2, tension: 0.2 },
-            { label: `Target (${target}%)`, data: trendList.map(() => target), borderColor: '#be123c', borderDash: [4, 4], borderWidth: 1.5, pointRadius: 0 }
-          ]
-        },
-        options: {
-          animation: false,
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { y: { min: 0, max: 100 } }
-        }
-      });
-    }
-
-    const topPareto = (this.kpiData.pareto || []).slice(0, 8);
-    if (cPareto) {
-      this.paretoChart = new Chart(cPareto, {
-        type: 'bar',
-        data: {
-          labels: topPareto.map((p) => p.component),
-          datasets: [{ data: topPareto.map((p) => p.totalHours), backgroundColor: '#e11d48', borderRadius: 3 }]
-        },
-        options: {
-          animation: false,
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } }
-        }
-      });
+    // 3.4 Catatan Mutasi Status Armada (Audit Log Transparansi Manajemen)
+    const mutations = this.kpiData.rosterMutations || [];
+    const mutBadge = document.getElementById('rep-mutation-badge');
+    const mutBody = document.getElementById('tbody-rep-mutations');
+    if (mutBadge) mutBadge.textContent = `${mutations.length} Mutasi`;
+    if (mutBody) {
+      mutBody.innerHTML = mutations.length === 0
+        ? `<tr><td colspan="5" class="px-3 py-3 text-center text-slate-400">Tidak ada perubahan mutasi status armada (On-Hired &harr; Off-Hired) selama periode laporan ini.</td></tr>`
+        : mutations.map((m) => `
+            <tr class="border-b border-slate-200">
+              <td class="px-2.5 py-1.5 font-mono text-[10px] whitespace-nowrap">${m.timestamp}</td>
+              <td class="px-2.5 py-1.5 font-bold text-slate-900">${m.unitId}</td>
+              <td class="px-2.5 py-1.5 font-semibold text-amber-800">${m.actionType}</td>
+              <td class="px-2.5 py-1.5">${m.username}</td>
+              <td class="px-2.5 py-1.5">${m.detail}</td>
+            </tr>`).join('');
     }
   },
 
@@ -3600,6 +3385,25 @@ const ReportModule = {
           9: { halign: 'right' }, 10: { halign: 'right' }, 11: { halign: 'center', fontStyle: 'bold' }
         }
       });
+      curY = doc.lastAutoTable.finalY + 6;
+
+      // 3.4 Fleet Roster Mutation Audit Table in PDF
+      const mutations = this.kpiData.rosterMutations || [];
+      doc.setFontSize(8.5);
+      doc.setTextColor(146, 64, 14);
+      doc.text(`3.4 Catatan Mutasi Status Armada / On-Hired <-> Off-Hired Audit Log (${mutations.length} Mutasi)`, margin, curY);
+      curY += 2;
+
+      const mutRows = mutations.map((m) => [m.timestamp, m.unitId, m.actionType, m.username, m.detail]);
+      doc.autoTable({
+        startY: curY,
+        margin: { left: margin, right: margin },
+        head: [['Waktu', 'Unit ID', 'Jenis Mutasi', 'Oleh', 'Keterangan Teknis & Unit Pengganti']],
+        body: mutRows.length > 0 ? mutRows : [['-', '-', '-', '-', 'Tidak ada perubahan mutasi status armada selama periode laporan ini.']],
+        theme: 'grid',
+        styles: { fontSize: 7.2, cellPadding: 1.6 },
+        headStyles: { fillColor: [146, 64, 14], textColor: 255, fontStyle: 'bold' }
+      });
       curY = doc.lastAutoTable.finalY + 8;
 
       // --- BAB IV. REKOMENDASI & LEMBAR PENGESAHAN ---
@@ -3701,20 +3505,31 @@ const ReportModule = {
 function getDemoApiResponse(action, payload, session) {
   const site = String(payload.site || session.siteAccess || 'TTLP').toUpperCase();
   const demoUnits = [
-    { unitId: 'EX-1320', category: 'Excavator', equipment: 'Heavy Excavator', brand: 'Hitachi', model: 'ZX870H-3F', site: site, status: 'W' },
-    { unitId: 'EX-1351', category: 'Excavator', equipment: 'Heavy Excavator', brand: 'Hitachi', model: 'ZX870H-3F', site: site, status: 'W' },
-    { unitId: 'DT-4012', category: 'Dump Truck', equipment: 'Off-Highway Truck', brand: 'Caterpillar', model: 'CAT-777E', site: site, status: 'W' },
-    { unitId: 'DZ-85', category: 'Bulldozer', equipment: 'Crawler Dozer', brand: 'Komatsu', model: 'D85ESS-2', site: site, status: 'R' }
+    { unitId: 'EX-1320', category: 'Excavator', equipment: 'Heavy Excavator', brand: 'Hitachi', model: 'ZX870H-3F', site: site, status: 'W', pendingOffHire: false, replacedUnitId: '', reason: '' },
+    { unitId: 'EX-1351', category: 'Excavator', equipment: 'Heavy Excavator', brand: 'Hitachi', model: 'ZX870H-3F', site: site, status: 'W', pendingOffHire: false, replacedUnitId: '', reason: '' },
+    { unitId: 'DT-4012', category: 'Dump Truck', equipment: 'Off-Highway Truck', brand: 'Caterpillar', model: 'CAT-777E', site: site, status: 'SW', pendingOffHire: false, replacedUnitId: '', reason: '' },
+    { unitId: 'DZ-85', category: 'Bulldozer', equipment: 'Crawler Dozer', brand: 'Komatsu', model: 'D85ESS-2', site: site, status: 'OH', pendingOffHire: false, replacedUnitId: '', reason: 'Standby Yard / Long-Term Overhaul' }
   ];
 
   if (action === 'GET_MASTER_DATA') {
+    const targetMonth = payload.month || '2026-11';
     return {
       status: 'success',
       site: site,
-      units: demoUnits.filter((u) => ['W', 'SW', 'R'].includes(u.status)),
+      month: targetMonth,
+      lockState: {
+        mode: 'LOCKED_MID_MONTH',
+        isLocked: true,
+        label: 'Monthly Roster Locked (One-Way Mid-Month Rule)',
+        description: 'Roster terkunci: Unit On-Hired hanya dapat diajukan Pending Off-Hire (efektif Tgl 1 bulan depan). Unit OH dapat ditarik darurat menjadi W dengan wajib memilih unit yang digantikan.'
+      },
+      isMaterialized: true,
+      inheritedFrom: targetMonth,
+      units: demoUnits.filter((u) => ['W', 'SW'].includes(u.status)),
       allSiteUnits: demoUnits,
       models: ['CAT-777E', 'D85ESS-2', 'ZX870H-3F'],
-      components: { HYD: 'Hydraulic System', ENG: 'Engine & Cooling', UND: 'Undercarriage' }
+      components: { HYD: 'Hydraulic System', ENG: 'Engine & Cooling', UND: 'Undercarriage' },
+      auditLogs: []
     };
   }
 
