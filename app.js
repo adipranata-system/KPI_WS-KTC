@@ -2372,9 +2372,9 @@ const InputHmModule = {
         return `<span class="text-[11px] font-bold text-rose-600">Start HM (${start}) &lt; Prev End (${expectedStart})! Click &#9881; if meter replaced.</span>${settingsHtml}`;
       }
       if (row.hmReset) {
-        badges.push(`<span class="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">&#128260; HM Reset (from ${expectedStart})</span>`);
+        badges.push(`<span class="inline-block px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">&#128260; HM Reset (from ${expectedStart})</span>`);
       } else if (gap > 0) {
-        badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; +${gap.toFixed(1)}h gap from Prev HM ${expectedStart} (${lastDateText})</span>`);
+        badges.push(`<span class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; +${gap.toFixed(1)}h jump vs Prev ${expectedStart} (${lastDateText})</span>`);
       }
     }
 
@@ -2385,7 +2385,7 @@ const InputHmModule = {
       } else if (diff > maxQuota) {
         badges.push(`<span class="text-[11px] font-bold text-rose-600">Exceeds ${maxQuota}h quota!</span>`);
         if (gap === 0 && expectedStart !== null && !row.hmReset) {
-          badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; +${diff.toFixed(1)}h gap from Prev HM ${expectedStart} (${lastDateText})</span>`);
+          badges.push(`<span class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; +${diff.toFixed(1)}h jump vs Prev ${expectedStart} (${lastDateText})</span>`);
         }
       } else {
         const rem = Math.max(0, Math.round((maxQuota - diff - (bdInfo?.hours || 0)) * 100) / 100);
