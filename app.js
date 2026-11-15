@@ -1876,6 +1876,7 @@ const InputHmModule = {
   isFriday: false,
   shortcutsBound: false,
   lastHmMap: {},
+  lastHmInfoMap: {},
   breakdownMap: { DAY: {}, NIGHT: {} },
   monthlyStatus: {},
   shifts: {
@@ -1885,6 +1886,13 @@ const InputHmModule = {
   operations: {
     DAY: [],
     NIGHT: []
+  },
+
+  formatIndoShortDate(ymd) {
+    if (!ymd || !/^\d{4}-\d{2}-\d{2}/.test(String(ymd))) return String(ymd || '');
+    const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number);
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    return `${String(d).padStart(2, '0')} ${months[(m - 1) || 0]} ${y}`;
   },
 
   init() {
@@ -1963,6 +1971,7 @@ const InputHmModule = {
       this.dayName = res.dayName || '';
       this.isFriday = Boolean(res.isFriday);
       this.lastHmMap = res.lastHmMap || {};
+      this.lastHmInfoMap = res.lastHmInfoMap || {};
       this.breakdownMap = res.breakdownMap || { DAY: {}, NIGHT: {} };
       this.monthlyStatus = res.monthlyStatus || {};
 
@@ -1973,8 +1982,16 @@ const InputHmModule = {
 
       // Keep empty when no saved rows exist until user clicks Fill Units (W) or Auto-Fill
       this.operations = {
-        DAY: (res.operations?.DAY || []).map((r) => ({ ...r })),
-        NIGHT: (res.operations?.NIGHT || []).map((r) => ({ ...r }))
+        DAY: (res.operations?.DAY || []).map((r) => ({
+          ...r,
+          hmReset: String(r.remarks || '').startsWith('HM Reset:'),
+          showSettings: false
+        })),
+        NIGHT: (res.operations?.NIGHT || []).map((r) => ({
+          ...r,
+          hmReset: String(r.remarks || '').startsWith('HM Reset:'),
+          showSettings: false
+        }))
       };
 
       this.syncShiftHeaders();
@@ -2084,9 +2101,12 @@ const InputHmModule = {
       this.toggleShiftWorking(shiftName, true);
     }
 
-    const activeUnits = AuthModule.masterData.units || [];
-    if (activeUnits.length === 0) {
-      showToast(`No active On-Hired units (W/SW) found for site ${AuthModule.currentSite}.`, 'warning');
+    // Hanya isi unit berstatus 'W' (Working); unit 'SW' (Standby Working) tidak di-autofill
+    const workingUnits = (AuthModule.masterData.units || []).filter(
+      (u) => String(u.status || '').trim().toUpperCase() === 'W'
+    );
+    if (workingUnits.length === 0) {
+      showToast(`No Working (W) units found for site ${AuthModule.currentSite}. Standby Working (SW) units are excluded from auto-fill.`, 'warning');
       return;
     }
 
@@ -2095,7 +2115,7 @@ const InputHmModule = {
       if (r.unitId) existingMap[String(r.unitId).trim()] = r;
     });
 
-    this.operations[shiftName] = activeUnits.map((u) => {
+    this.operations[shiftName] = workingUnits.map((u) => {
       const prev = existingMap[u.unitId];
       const expectedStart = this.getExpectedStartHm(shiftName, u.unitId);
       const hmStart = prev && prev.hmStart !== '' ? prev.hmStart : (expectedStart !== null ? expectedStart : '');
@@ -2110,7 +2130,9 @@ const InputHmModule = {
         hmStart: hmStart,
         hmEnd: hmEnd,
         wh: wh,
-        remarks: prev?.remarks || ''
+        remarks: prev?.remarks || '',
+        hmReset: prev?.hmReset || false,
+        showSettings: false
       };
     });
 
@@ -2126,7 +2148,7 @@ const InputHmModule = {
     this.quickFillActiveUnits('DAY', false);
     this.quickFillActiveUnits('NIGHT', false);
     setTimeout(() => this.focusFirstInput('DAY'), 20);
-    showToast('Populated active On-Hired units for Day & Night shifts.', 'info');
+    showToast('Populated Working (W) units for Day & Night shifts (SW units remain Standby).', 'info');
   },
 
   addUnitRow(shiftName, autoFocus = false) {
@@ -2138,7 +2160,9 @@ const InputHmModule = {
       hmStart: '',
       hmEnd: '',
       wh: 0,
-      remarks: ''
+      remarks: '',
+      hmReset: false,
+      showSettings: false
     });
     this.renderShiftTable(shiftName);
     this.updateLiveSummary();
@@ -2153,6 +2177,21 @@ const InputHmModule = {
 
   removeUnitRow(shiftName, idx) {
     this.operations[shiftName].splice(idx, 1);
+    this.renderShiftTable(shiftName);
+    this.updateLiveSummary();
+  },
+
+  toggleRowSettings(shiftName, idx) {
+    const row = this.operations[shiftName]?.[idx];
+    if (!row) return;
+    row.showSettings = !row.showSettings;
+    this.renderShiftTable(shiftName);
+  },
+
+  toggleRowHmReset(shiftName, idx, checked) {
+    const row = this.operations[shiftName]?.[idx];
+    if (!row) return;
+    row.hmReset = Boolean(checked);
     this.renderShiftTable(shiftName);
     this.updateLiveSummary();
   },
@@ -2260,7 +2299,7 @@ const InputHmModule = {
     lines.forEach((line, offset) => {
       const rIdx = startIdx + offset;
       while (this.operations[shiftName].length <= rIdx) {
-        this.operations[shiftName].push({ unitId: '', model: '', hmStart: '', hmEnd: '', wh: 0, remarks: '' });
+        this.operations[shiftName].push({ unitId: '', model: '', hmStart: '', hmEnd: '', wh: 0, remarks: '', hmReset: false, showSettings: false });
       }
       const cols = line.split('\t').map((c) => c.trim());
       if (cols.length >= 3) {
@@ -2280,12 +2319,23 @@ const InputHmModule = {
     showToast(`Pasted ${lines.length} row(s) into ${shiftName} Shift.`, 'success');
   },
 
-  buildRowStatusHtml(shiftName, row) {
+  buildRowStatusHtml(shiftName, row, idx) {
     const maxQuota = shiftName === 'DAY' && this.isFriday ? 9 : 10;
     const expectedStart = this.getExpectedStartHm(shiftName, row.unitId);
     const bdInfo = row.unitId ? this.breakdownMap[shiftName]?.[row.unitId] : null;
     const start = parseFloat(row.hmStart);
     const end = parseFloat(row.hmEnd);
+
+    const settingsHtml = row.showSettings
+      ? `<div class="mt-1.5 pt-1.5 border-t border-slate-200">
+          <label class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-indigo-50 border border-indigo-200 text-[10px] font-bold text-indigo-950 cursor-pointer select-none">
+            <input type="checkbox" ${row.hmReset ? 'checked' : ''}
+              onchange="InputHmModule.toggleRowHmReset('${shiftName}', ${idx}, this.checked)"
+              class="w-3 h-3 text-indigo-600 rounded" />
+            <span>Unit Ganti Hourmeter (HM Reset)</span>
+          </label>
+        </div>`
+      : '';
 
     const badges = [];
     if (bdInfo && bdInfo.hours > 0) {
@@ -2294,29 +2344,43 @@ const InputHmModule = {
 
     if (!isNaN(start) && expectedStart !== null) {
       const gap = Math.round((start - expectedStart) * 100) / 100;
-      if (gap < 0) {
-        return `<span class="text-[11px] font-bold text-rose-600">Start (${start}) &lt; Prev (${expectedStart})!</span>`;
+      if (gap < 0 && !row.hmReset) {
+        return `<span class="text-[11px] font-bold text-rose-600">HM Awal (${start}) &lt; HM Akhir sblmnya (${expectedStart})! Klik &#9881; jika ganti meteran.</span>${settingsHtml}`;
       }
-      if (gap > 24) {
-        return `<span class="text-[11px] font-bold text-rose-600">Jump +${gap}h from Prev (${expectedStart})!</span>`;
+      if (row.hmReset) {
+        badges.push(`<span class="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">&#128260; HM Reset (dari ${expectedStart})</span>`);
+      } else if (gap > 0) {
+        let lastDateText = 'sebelumnya';
+        if (shiftName === 'NIGHT') {
+          const dayRow = this.operations.DAY.find((r) => String(r.unitId || '').trim() === String(row.unitId || '').trim());
+          if (dayRow && dayRow.hmEnd !== '' && !isNaN(parseFloat(dayRow.hmEnd))) {
+            lastDateText = this.formatIndoShortDate(this.selectedDate);
+          } else if (this.lastHmInfoMap[row.unitId]?.date) {
+            lastDateText = this.formatIndoShortDate(this.lastHmInfoMap[row.unitId].date);
+          }
+        } else if (this.lastHmInfoMap[row.unitId]?.date) {
+          lastDateText = this.formatIndoShortDate(this.lastHmInfoMap[row.unitId].date);
+        }
+        badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; Terdeteksi selisih +${gap.toFixed(1)}j dari HM akhir ${expectedStart} (diisi Tgl ${lastDateText})</span>`);
       }
     }
 
     if (!isNaN(start) && !isNaN(end)) {
       const diff = Math.round((end - start) * 100) / 100;
       if (diff < 0) {
-        return `<span class="text-[11px] font-bold text-rose-600">End HM &lt; Start HM!</span>`;
+        return `<span class="text-[11px] font-bold text-rose-600">End HM &lt; Start HM!</span>${settingsHtml}`;
       }
       if (diff > maxQuota) {
-        return `<span class="text-[11px] font-bold text-rose-600">Exceeds ${maxQuota}h quota!</span>`;
+        return `<span class="text-[11px] font-bold text-rose-600">Exceeds ${maxQuota}h quota!</span>${settingsHtml}`;
       }
       const rem = Math.max(0, Math.round((maxQuota - diff - (bdInfo?.hours || 0)) * 100) / 100);
       badges.push(`<span class="text-[11px] text-slate-500">${rem > 0 ? `Stby ${rem}h` : 'Full'}</span>`);
-    } else if (expectedStart !== null) {
+    } else if (expectedStart !== null && !row.hmReset) {
       badges.push(`<span class="text-[10px] text-blue-600">Prev: ${expectedStart}</span>`);
     }
 
-    return badges.length > 0 ? badges.join(' ') : '<span class="text-[11px] text-slate-400">-</span>';
+    const baseHtml = badges.length > 0 ? badges.join(' ') : '<span class="text-[11px] text-slate-400">-</span>';
+    return `${baseHtml}${settingsHtml}`;
   },
 
   updateRowVisuals(shiftName, idx) {
@@ -2336,7 +2400,7 @@ const InputHmModule = {
         : 'px-2 py-1.5 text-right font-semibold text-xs text-slate-400';
     }
     if (statusCell) {
-      statusCell.innerHTML = this.buildRowStatusHtml(shiftName, row);
+      statusCell.innerHTML = this.buildRowStatusHtml(shiftName, row, idx);
     }
   },
 
@@ -2398,11 +2462,16 @@ const InputHmModule = {
               ${whVal.toFixed(1)}h
             </td>
             <td id="hm-status-${shiftName}-${idx}" class="px-2 py-1.5">
-              ${this.buildRowStatusHtml(shiftName, row)}
+              ${this.buildRowStatusHtml(shiftName, row, idx)}
             </td>
-            <td class="px-2 py-1.5 text-center">
+            <td class="px-2 py-1.5 text-center whitespace-nowrap">
+              <button type="button" tabindex="-1" onclick="InputHmModule.toggleRowSettings('${shiftName}', ${idx})"
+                title="Pengaturan HM Unit (Reset Hourmeter)"
+                class="${row.hmReset ? 'text-indigo-700 bg-indigo-100' : 'text-slate-400 hover:text-slate-700'} px-1 py-0.5 rounded transition">
+                &#9881;
+              </button>
               <button type="button" tabindex="-1" onclick="InputHmModule.removeUnitRow('${shiftName}', ${idx})"
-                title="Remove Row" class="text-slate-400 hover:text-rose-600 font-bold px-1.5 py-0.5 rounded">
+                title="Remove Row" class="text-slate-400 hover:text-rose-600 font-bold px-1 py-0.5 rounded">
                 &times;
               </button>
             </td>
@@ -2497,12 +2566,8 @@ const InputHmModule = {
         const expected = this.getExpectedStartHm(sh, uid);
         if (expected !== null) {
           const gap = Math.round((start - expected) * 100) / 100;
-          if (gap < 0) {
-            showToast(`Start HM for ${uid} (${start}) cannot be less than previous End HM (${expected}).`, 'error');
-            return;
-          }
-          if (gap > 24) {
-            showToast(`Start HM for ${uid} (${start}) jumps +${gap}h from previous End HM (${expected}).`, 'error');
+          if (gap < 0 && !row.hmReset) {
+            showToast(`Start HM for ${uid} (${start}) cannot be less than previous End HM (${expected}). Click ⚙️ on that row if hourmeter was replaced.`, 'error');
             return;
           }
         }
@@ -2513,13 +2578,19 @@ const InputHmModule = {
           return;
         }
 
+        let finalRemarks = String(row.remarks || '').trim();
+        if (row.hmReset) {
+          const resetTag = `HM Reset: ${expected !== null ? expected : '-'} -> ${start}`;
+          finalRemarks = finalRemarks.startsWith('HM Reset:') ? finalRemarks : resetTag;
+        }
+
         filteredOps[sh].push({
           unitId: uid,
           model: row.model || '',
           hmStart: start,
           hmEnd: end,
           wh: wh,
-          remarks: row.remarks || ''
+          remarks: finalRemarks
         });
       }
     }
@@ -2557,6 +2628,7 @@ const PopulationModule = {
   selectedMonth: '',
   rosterUnits: [],
   auditLogs: [],
+  forceOverride: false,
   lockState: {
     mode: 'GRACE_PERIOD',
     isLocked: false,
@@ -2565,6 +2637,24 @@ const PopulationModule = {
   },
   isMaterialized: false,
   inheritedFrom: '',
+
+  isSuperadmin() {
+    const session = getUserSession();
+    return String(session?.role || '').trim().toUpperCase() === 'SUPERADMIN';
+  },
+
+  toggleForceOverride() {
+    if (!this.isSuperadmin()) return;
+    this.forceOverride = !this.forceOverride;
+    this.renderLockBanner();
+    this.renderTable();
+    showToast(
+      this.forceOverride
+        ? 'Superadmin Force Override ENABLED: All unit statuses unlocked for this period.'
+        : 'Superadmin Force Override disabled.',
+      this.forceOverride ? 'warning' : 'info'
+    );
+  },
 
   init() {
     const picker = document.getElementById('pop-month-picker');
@@ -2577,6 +2667,7 @@ const PopulationModule = {
 
   async loadMonth() {
     this.init();
+    this.forceOverride = false;
     const picker = document.getElementById('pop-month-picker');
     const targetMonth = picker?.value || this.selectedMonth;
     this.selectedMonth = targetMonth;
@@ -2643,16 +2734,19 @@ const PopulationModule = {
     const btnSave = document.getElementById('btn-save-bulk-status');
 
     const mode = this.lockState.mode || 'GRACE_PERIOD';
+    const isOverrideActive = this.isSuperadmin() && this.forceOverride;
 
     if (badge) {
-      badge.textContent = this.lockState.label || mode;
+      badge.textContent = isOverrideActive ? 'SUPERADMIN FORCE OVERRIDE ACTIVE' : (this.lockState.label || mode);
       const badgeStyles = {
         PLANNING: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-indigo-100 text-indigo-800 border border-indigo-200',
         GRACE_PERIOD: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200',
         LOCKED_MID_MONTH: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-amber-100 text-amber-900 border border-amber-300',
         HISTORICAL_FROZEN: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-slate-200 text-slate-700 border border-slate-300'
       };
-      badge.className = badgeStyles[mode] || badgeStyles.GRACE_PERIOD;
+      badge.className = isOverrideActive
+        ? 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-rose-600 text-white border border-rose-700 shadow-xs'
+        : (badgeStyles[mode] || badgeStyles.GRACE_PERIOD);
     }
 
     if (info) {
@@ -2662,17 +2756,40 @@ const PopulationModule = {
     }
 
     if (banner && desc) {
-      desc.textContent = this.lockState.description || '';
-      banner.className = mode === 'LOCKED_MID_MONTH'
-        ? 'p-3 rounded-lg bg-amber-50/80 border border-amber-200 text-xs text-amber-950 flex items-start gap-2'
-        : 'p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex items-start gap-2';
+      desc.textContent = isOverrideActive
+        ? 'Mode Override Superadmin aktif: Anda dapat mengubah status unit mana pun (W, SW, OH, S) kapan saja. Wajib isi alasan teknis pada baris unit yang diubah untuk jejak audit.'
+        : (this.lockState.description || '');
+      banner.className = isOverrideActive
+        ? 'p-3 rounded-lg bg-rose-50 border border-rose-300 text-xs text-rose-950 flex flex-wrap items-center justify-between gap-2'
+        : mode === 'LOCKED_MID_MONTH'
+        ? 'p-3 rounded-lg bg-amber-50/80 border border-amber-200 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-2'
+        : 'p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex flex-wrap items-center justify-between gap-2';
+
+      let overrideBtn = document.getElementById('btn-superadmin-force-override');
+      if (this.isSuperadmin() && this.lockState.isLocked) {
+        if (!overrideBtn) {
+          overrideBtn = document.createElement('button');
+          overrideBtn.id = 'btn-superadmin-force-override';
+          overrideBtn.type = 'button';
+          overrideBtn.onclick = () => PopulationModule.toggleForceOverride();
+          banner.appendChild(overrideBtn);
+        }
+        overrideBtn.className = isOverrideActive
+          ? 'px-3 py-1.5 text-[11px] font-extrabold bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-xs transition shrink-0'
+          : 'px-3 py-1.5 text-[11px] font-extrabold bg-rose-600 hover:bg-rose-700 text-white rounded-lg shadow-xs transition shrink-0';
+        overrideBtn.textContent = isOverrideActive
+          ? 'Disable Force Override'
+          : 'Superadmin Force Override';
+      } else if (overrideBtn) {
+        overrideBtn.remove();
+      }
     }
 
     if (btnCopy) {
-      btnCopy.disabled = Boolean(this.lockState.isLocked);
+      btnCopy.disabled = Boolean(this.lockState.isLocked) && !isOverrideActive;
     }
     if (btnSave) {
-      btnSave.disabled = mode === 'HISTORICAL_FROZEN';
+      btnSave.disabled = mode === 'HISTORICAL_FROZEN' && !isOverrideActive;
     }
   },
 
@@ -2693,7 +2810,8 @@ const PopulationModule = {
   },
 
   async copyPreviousRoster() {
-    if (this.lockState.isLocked) {
+    const isOverrideActive = this.isSuperadmin() && this.forceOverride;
+    if (this.lockState.isLocked && !isOverrideActive) {
       showToast('This roster period is locked and cannot be overwritten.', 'warning');
       return;
     }
@@ -2707,7 +2825,8 @@ const PopulationModule = {
     const res = await callBackendApi('MANAGE_UNIT_POPULATION', {
       mode: 'COPY_PREVIOUS_ROSTER',
       site: AuthModule.currentSite,
-      month: this.selectedMonth
+      month: this.selectedMonth,
+      forceOverride: isOverrideActive
     });
 
     if (btn) {
@@ -2768,8 +2887,9 @@ const PopulationModule = {
     }
 
     const mode = this.lockState.mode || 'GRACE_PERIOD';
-    const isMidMonthLocked = mode === 'LOCKED_MID_MONTH';
-    const isFrozen = mode === 'HISTORICAL_FROZEN';
+    const isOverrideActive = this.isSuperadmin() && this.forceOverride;
+    const isMidMonthLocked = mode === 'LOCKED_MID_MONTH' && !isOverrideActive;
+    const isFrozen = mode === 'HISTORICAL_FROZEN' && !isOverrideActive;
 
     const statusOptions = [
       { val: 'W', label: 'W (Working - On-Hired)' },
@@ -2827,7 +2947,15 @@ const PopulationModule = {
 
         // Kolom Governance & Catatan Mutasi
         let govHtml = '';
-        if (u.pendingOffHire) {
+        if (isOverrideActive && u.status !== u._origStatus) {
+          govHtml += `<div class="space-y-1">
+            <span class="inline-block px-2 py-0.5 text-[10px] font-extrabold bg-rose-600 text-white rounded">FORCE OVERRIDE (${u._origStatus} &rarr; ${u.status})</span>
+            <input type="text" value="${(u.reason || '').replace(/"/g, '&quot;')}"
+              oninput="PopulationModule.onOverrideReasonChange('${u.unitId}', this.value)"
+              placeholder="Wajib isi alasan teknis override..."
+              class="w-full px-2 py-1 text-[11px] border border-rose-300 rounded bg-white focus:outline-none focus:border-rose-600" />
+          </div>`;
+        } else if (u.pendingOffHire) {
           govHtml += `<div class="inline-flex flex-wrap items-center gap-1.5">
             <span class="px-2 py-0.5 text-[10px] font-extrabold bg-amber-500 text-slate-950 rounded">PENDING OFF-HIRE (Eff. 1st Next Month)</span>
             ${!isFrozen ? `<button type="button" onclick="PopulationModule.cancelPendingOffHire('${u.unitId}')" class="text-[11px] font-bold text-rose-600 hover:underline">Cancel</button>` : ''}
@@ -2851,7 +2979,7 @@ const PopulationModule = {
         if (u.replacedUnitId) {
           govHtml += `<div class="text-[11px] font-bold text-indigo-700 mt-1">Replaces Unit: ${u.replacedUnitId}</div>`;
         }
-        if (u.reason) {
+        if (u.reason && !(isOverrideActive && u.status !== u._origStatus)) {
           govHtml += `<div class="text-[11px] text-slate-600 mt-0.5 max-w-md">${u.reason}</div>`;
         }
 
@@ -2883,6 +3011,12 @@ const PopulationModule = {
       target.pendingOffHire = false;
     }
     this.renderTable();
+  },
+
+  onOverrideReasonChange(unitId, val) {
+    const target = this.rosterUnits.find((u) => u.unitId === unitId);
+    if (!target) return;
+    target.reason = val;
   },
 
   cancelPendingOffHire(unitId) {
@@ -2982,6 +3116,7 @@ const PopulationModule = {
     tbody.innerHTML = logs
       .map((l) => {
         const badgeCls = {
+          SUPERADMIN_FORCE_OVERRIDE: 'bg-rose-100 text-rose-800',
           EMERGENCY_PULL_IN: 'bg-indigo-100 text-indigo-800',
           PENDING_OFF_HIRE: 'bg-amber-100 text-amber-900',
           CANCEL_PENDING_OH: 'bg-slate-200 text-slate-700',
@@ -3028,13 +3163,14 @@ const PopulationModule = {
   },
 
   async saveBulkStatus(forceSave = false) {
-    if (this.lockState.mode === 'HISTORICAL_FROZEN') {
+    const isOverrideActive = this.isSuperadmin() && this.forceOverride;
+    if (this.lockState.mode === 'HISTORICAL_FROZEN' && !isOverrideActive) {
       showToast('Historical roster period is permanently locked.', 'error');
       return;
     }
 
     const btn = document.getElementById('btn-save-bulk-status');
-    const hasChanges = this.rosterUnits.some(
+    const changedUnits = this.rosterUnits.filter(
       (u) =>
         u.status !== u._origStatus ||
         Boolean(u.pendingOffHire) !== u._origPending ||
@@ -3042,9 +3178,17 @@ const PopulationModule = {
         (u.reason || '') !== u._origReason
     );
 
-    if (!hasChanges && !forceSave && this.isMaterialized) {
+    if (changedUnits.length === 0 && !forceSave && this.isMaterialized) {
       showToast('No roster changes detected.', 'warning');
       return;
+    }
+
+    if (isOverrideActive) {
+      const missingReason = changedUnits.find((u) => u.status !== u._origStatus && !String(u.reason || '').trim());
+      if (missingReason) {
+        showToast(`Wajib isi alasan teknis override untuk unit ${missingReason.unitId} sebelum menyimpan.`, 'error');
+        return;
+      }
     }
 
     if (btn) {
@@ -3064,6 +3208,7 @@ const PopulationModule = {
       mode: 'SAVE_MONTHLY_ROSTER',
       site: AuthModule.currentSite,
       month: this.selectedMonth,
+      forceOverride: isOverrideActive,
       units: payloadUnits
     });
 
