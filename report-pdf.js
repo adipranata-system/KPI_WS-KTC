@@ -1756,11 +1756,16 @@ function getDemoApiResponse(action, payload, session) {
       month: payload.month || '2026-11',
       target: 85,
       dailyHistory: [
-        { date: '2026-11-14', dayName: 'Saturday', unitCount: 4, calHrs: 80, wh: 66.0, bdUnsched: 5.0, bdSched: 2.0, rainHrs: 2.0, stbyHrs: 5.0, pa: 91.25, ma: 92.96, ua: 90.41, mttr: 2.5 },
-        { date: '2026-11-13', dayName: 'Friday', unitCount: 4, calHrs: 76, wh: 61.0, bdUnsched: 6.0, bdSched: 2.0, rainHrs: 1.0, stbyHrs: 6.0, pa: 89.47, ma: 91.04, ua: 89.71, mttr: 3.0 }
+        { date: '2026-11-14', dayName: 'Saturday', unitCount: 4, calHrs: 80, wh: 66.0, bdUnsched: 5.0, bdSched: 2.0, rainHrs: 2.0, stbyHrs: 5.0, freqUnsched: 2, pa: 91.25, ma: 92.96, ua: 90.41, mttr: 2.5, mtbr: 33.0 },
+        { date: '2026-11-13', dayName: 'Friday', unitCount: 4, calHrs: 76, wh: 61.0, bdUnsched: 6.0, bdSched: 2.0, rainHrs: 1.0, stbyHrs: 6.0, freqUnsched: 2, pa: 89.47, ma: 91.04, ua: 89.71, mttr: 3.0, mtbr: 30.5 }
       ],
       unitHistory: [
-        { date: '2026-11-14', unitId: 'EX-1320', model: 'ZX870H-3F', calHrs: 20, wh: 18.0, bdUnsched: 0, bdSched: 0, rainHrs: 0.5, stbyHrs: 1.5, pa: 100, ma: 100, ua: 90.0 }
+        { date: '2026-11-14', dayName: 'Saturday', unitId: 'EX-1320', model: 'ZX870H-3F', calHrs: 20, wh: 18.0, bdUnsched: 0, bdSched: 0, rainHrs: 0.5, stbyHrs: 1.5, freqUnsched: 0, pa: 100, ma: 100, ua: 90.0, mttr: 0, mtbr: 18.0 },
+        { date: '2026-11-14', dayName: 'Saturday', unitId: 'EX-1351', model: 'ZX870H-3F', calHrs: 20, wh: 13.0, bdUnsched: 5.0, bdSched: 0, rainHrs: 0.5, stbyHrs: 1.5, freqUnsched: 2, pa: 75.0, ma: 72.22, ua: 86.67, mttr: 2.5, mtbr: 6.5 }
+      ],
+      breakdownDetails: [
+        { date: '2026-11-14', unitId: 'EX-1351', model: 'ZX870H-3F', wo: 'WO-4418', code: 'USCH', category: 'UNSCHEDULED', status: 'Ready', timeIn: '08:00', timeOut: '14:00', pureHours: 5.0, component: 'HYD - Hydraulic System', location: 'Pit North', problem: 'Boom cylinder hydraulic hose leak & seal replacement' },
+        { date: '2026-11-14', unitId: 'DT-4012', model: 'CAT-777E', wo: 'WO-4419', code: 'SVC', category: 'SCHEDULED', status: 'Ready', timeIn: '10:00', timeOut: '13:00', pureHours: 2.0, component: 'ENG - Engine & Cooling', location: 'Workshop', problem: 'Periodic Service PS-250 & oil filter change' }
       ]
     };
   }
