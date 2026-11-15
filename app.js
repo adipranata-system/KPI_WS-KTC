@@ -1008,6 +1008,7 @@ const DashboardModule = {
  * ============================================================================ */
 const HistoryModule = {
   data: null,
+  sortState: { field: 'date', asc: false },
 
   init() {
     const picker = document.getElementById('hist-month-picker');
@@ -1017,11 +1018,205 @@ const HistoryModule = {
     }
   },
 
+  clearDateFilter() {
+    const dateInput = document.getElementById('hist-date-filter');
+    if (dateInput) dateInput.value = '';
+    this.render();
+  },
+
+  sortBy(field) {
+    if (this.sortState.field === field) {
+      this.sortState.asc = !this.sortState.asc;
+    } else {
+      this.sortState.field = field;
+      this.sortState.asc = ['unitId', 'model', 'dayName'].includes(field);
+    }
+    this.render();
+  },
+
+  getSortIndicator(field) {
+    if (this.sortState.field !== field) return '<span class="opacity-40">&#8597;</span>';
+    return this.sortState.asc ? '<span class="text-blue-600">&#9650;</span>' : '<span class="text-blue-600">&#9660;</span>';
+  },
+
+  getFilteredRows() {
+    if (!this.data) return [];
+    const mode = document.getElementById('hist-view-mode')?.value || 'DAILY';
+    const modelFilter = document.getElementById('hist-filter-model')?.value || 'ALL';
+    const dateFilter = document.getElementById('hist-date-filter')?.value || '';
+    const statusFilter = document.getElementById('hist-filter-status')?.value || 'ALL';
+    const keyword = String(document.getElementById('hist-search-input')?.value || '').trim().toLowerCase();
+    const target = this.data.target || APP_CONFIG.KPI_TARGET;
+
+    const sourceList = mode === 'DAILY' ? (this.data.dailyHistory || []) : (this.data.unitHistory || []);
+    const filtered = sourceList.filter((r) => {
+      if (mode === 'UNIT' && modelFilter !== 'ALL' && r.model !== modelFilter) return false;
+      if (dateFilter && r.date !== dateFilter) return false;
+      if (statusFilter === 'PASS' && r.pa < target) return false;
+      if (statusFilter === 'BELOW' && r.pa >= target) return false;
+      if (keyword) {
+        if (mode === 'DAILY') {
+          if (!r.date.includes(keyword) && !(r.dayName || '').toLowerCase().includes(keyword)) return false;
+        } else {
+          if (
+            !r.date.includes(keyword) &&
+            !(r.unitId || '').toLowerCase().includes(keyword) &&
+            !(r.model || '').toLowerCase().includes(keyword)
+          ) {
+            return false;
+          }
+        }
+      }
+      return true;
+    });
+
+    const { field, asc } = this.sortState;
+    filtered.sort((a, b) => {
+      const valA = a[field] !== undefined ? a[field] : (typeof a.date === 'string' ? a.date : 0);
+      const valB = b[field] !== undefined ? b[field] : (typeof b.date === 'string' ? b.date : 0);
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        const cmp = valA.localeCompare(valB);
+        if (cmp !== 0) return asc ? cmp : -cmp;
+        return (b.date || '').localeCompare(a.date || '');
+      }
+      const diff = (Number(valA) || 0) - (Number(valB) || 0);
+      if (diff !== 0) return asc ? diff : -diff;
+      return (b.date || '').localeCompare(a.date || '');
+    });
+
+    return filtered;
+  },
+
+  computeAggregate(rows) {
+    let sumCal = 0;
+    let sumWh = 0;
+    let sumUnsch = 0;
+    let sumSch = 0;
+    let sumRain = 0;
+    let sumStby = 0;
+    let sumFreq = 0;
+
+    rows.forEach((r) => {
+      sumCal += Number(r.calHrs) || 0;
+      sumWh += Number(r.wh) || 0;
+      sumUnsch += Number(r.bdUnsched) || 0;
+      sumSch += Number(r.bdSched) || 0;
+      sumRain += Number(r.rainHrs) || 0;
+      sumStby += Number(r.stbyHrs) || 0;
+      sumFreq += Number(r.freqUnsched) || 0;
+    });
+
+    const avail = Math.max(0, sumCal - sumUnsch - sumSch);
+    const totPa = sumCal > 0 ? (avail / sumCal) * 100 : 0;
+    const totMa = sumWh + sumUnsch > 0 ? (sumWh / (sumWh + sumUnsch)) * 100 : (sumCal > 0 ? 100 : 0);
+    const totUa = avail > 0 ? (sumWh / avail) * 100 : 0;
+    const totMttr = sumFreq > 0 ? sumUnsch / sumFreq : 0;
+    const totMtbr = sumFreq > 0 ? sumWh / sumFreq : sumWh;
+
+    return { sumCal, sumWh, sumUnsch, sumSch, sumRain, sumStby, sumFreq, totPa, totMa, totUa, totMttr, totMtbr };
+  },
+
+  updateSummaryStrip(agg, target) {
+    const elWh = document.getElementById('hist-sum-wh');
+    const elCal = document.getElementById('hist-sum-cal');
+    const elBd = document.getElementById('hist-sum-bd');
+    const elFreq = document.getElementById('hist-sum-freq');
+    const elPa = document.getElementById('hist-sum-pa');
+    const elMa = document.getElementById('hist-sum-ma');
+    const elRel = document.getElementById('hist-sum-reliability');
+
+    if (elWh) elWh.textContent = `${agg.sumWh.toFixed(1)} Hrs`;
+    if (elCal) elCal.textContent = `of ${agg.sumCal.toFixed(1)} Cal Hrs`;
+    if (elBd) elBd.textContent = `${agg.sumUnsch.toFixed(1)}h / ${agg.sumSch.toFixed(1)}h`;
+    if (elFreq) elFreq.textContent = `${agg.sumFreq} Unsched Event${agg.sumFreq === 1 ? '' : 's'}`;
+
+    if (elPa) {
+      elPa.textContent = `${agg.totPa.toFixed(2)}%`;
+      elPa.className = `text-lg font-extrabold mt-0.5 ${agg.sumCal > 0 && agg.totPa >= target ? 'text-emerald-600' : agg.sumCal > 0 ? 'text-rose-600' : 'text-slate-900'}`;
+    }
+    if (elMa) {
+      elMa.textContent = `${agg.totMa.toFixed(2)}%`;
+      elMa.className = `text-lg font-extrabold mt-0.5 ${agg.sumCal > 0 && agg.totMa >= target ? 'text-emerald-600' : agg.sumCal > 0 ? 'text-rose-600' : 'text-slate-900'}`;
+    }
+    if (elRel) {
+      elRel.textContent = `${agg.totMttr.toFixed(2)}h / ${agg.totMtbr.toFixed(2)}h`;
+    }
+  },
+
+  openBdModal(dateYMD, unitId, category) {
+    if (!this.data) return;
+    const modal = document.getElementById('modal-hist-bd-details');
+    const titleEl = document.getElementById('modal-hist-bd-title');
+    const subEl = document.getElementById('modal-hist-bd-subtitle');
+    const tbody = document.getElementById('tbody-hist-bd-modal');
+    const totalEl = document.getElementById('modal-hist-bd-total');
+    if (!modal || !tbody) return;
+
+    const allLogs = this.data.breakdownDetails || [];
+    let matches = allLogs.filter((d) => {
+      if (dateYMD && d.date !== dateYMD) return false;
+      if (unitId && d.unitId !== unitId) return false;
+      if (category && d.category !== category) return false;
+      return true;
+    });
+
+    if (matches.length === 0 && category) {
+      matches = allLogs.filter((d) => d.date === dateYMD && (!unitId || d.unitId === unitId));
+    }
+
+    const catLabel = category === 'SCHEDULED' ? 'Scheduled Breakdown (SCH/SVC)' : 'Unscheduled Breakdown (USCH/ACD)';
+    if (titleEl) {
+      titleEl.textContent = unitId
+        ? `Breakdown Logs — Unit ${unitId} (${dateYMD})`
+        : `Fleet Breakdown Logs — ${dateYMD}`;
+    }
+    if (subEl) {
+      subEl.textContent = `${catLabel} • Site ${AuthModule.currentSite}`;
+    }
+
+    if (matches.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" class="px-3 py-5 text-center text-slate-400">No detailed breakdown log rows recorded for ${dateYMD}${unitId ? ' (' + unitId + ')' : ''}.</td></tr>`;
+      if (totalEl) totalEl.textContent = 'Total Logged Pure BD: 0.00 Hrs';
+    } else {
+      let totPure = 0;
+      tbody.innerHTML = matches
+        .map((m) => {
+          totPure += Number(m.pureHours) || 0;
+          const isSched = m.category === 'SCHEDULED';
+          return `
+            <tr class="border-b border-slate-100 hover:bg-slate-50">
+              <td class="px-2.5 py-2 font-medium whitespace-nowrap">${m.date}</td>
+              <td class="px-2.5 py-2 font-bold text-slate-900 whitespace-nowrap">${m.unitId}</td>
+              <td class="px-2.5 py-2 text-slate-600 whitespace-nowrap">${m.model || '-'}</td>
+              <td class="px-2.5 py-2 font-mono text-[11px]">${m.wo || '-'}</td>
+              <td class="px-2.5 py-2"><span class="px-1.5 py-0.5 rounded font-bold text-[10px] ${isSched ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-700'}">${m.code}</span></td>
+              <td class="px-2.5 py-2 font-mono text-[11px] whitespace-nowrap">${m.timeIn || '-'} - ${m.timeOut || 'Open'}</td>
+              <td class="px-2.5 py-2 text-right font-bold ${isSched ? 'text-amber-700' : 'text-rose-600'}">${(Number(m.pureHours) || 0).toFixed(2)}h</td>
+              <td class="px-2.5 py-2 text-slate-700">${m.component || '-'}</td>
+              <td class="px-2.5 py-2 text-slate-600">${m.problem || '-'}</td>
+            </tr>`;
+        })
+        .join('');
+      if (totalEl) totalEl.textContent = `Total Logged Pure BD: ${totPure.toFixed(2)} Hrs (${matches.length} Incident${matches.length === 1 ? '' : 's'})`;
+    }
+
+    modal.classList.remove('hidden');
+  },
+
+  closeBdModal() {
+    document.getElementById('modal-hist-bd-details')?.classList.add('hidden');
+  },
+
   async load() {
     this.init();
     const monthVal = document.getElementById('hist-month-picker')?.value;
     const statusBox = document.getElementById('hist-status-msg');
     if (!monthVal) return;
+
+    const dateFilterEl = document.getElementById('hist-date-filter');
+    if (dateFilterEl && dateFilterEl.value && !dateFilterEl.value.startsWith(monthVal)) {
+      dateFilterEl.value = '';
+    }
 
     if (statusBox) statusBox.textContent = `Loading KPI history for ${monthVal}...`;
 
@@ -1046,9 +1241,6 @@ const HistoryModule = {
 
     const mode = document.getElementById('hist-view-mode')?.value || 'DAILY';
     const modelWrap = document.getElementById('hist-model-filter-wrap');
-    const modelFilter = document.getElementById('hist-filter-model')?.value || 'ALL';
-    const statusFilter = document.getElementById('hist-filter-status')?.value || 'ALL';
-    const keyword = String(document.getElementById('hist-search-input')?.value || '').trim().toLowerCase();
     const target = this.data.target || APP_CONFIG.KPI_TARGET;
 
     if (modelWrap) {
@@ -1062,142 +1254,157 @@ const HistoryModule = {
     const countBadge = document.getElementById('hist-row-count');
     if (!thead || !tbody || !tfoot) return;
 
+    const rows = this.getFilteredRows();
+    const agg = this.computeAggregate(rows);
+    this.updateSummaryStrip(agg, target);
+
     if (mode === 'DAILY') {
       thead.innerHTML = `
-        <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
-          <th class="px-3 py-2.5">Date</th>
-          <th class="px-3 py-2.5">Day</th>
-          <th class="px-3 py-2.5 text-right">Fleet Size</th>
-          <th class="px-3 py-2.5 text-right">Cal Hrs</th>
-          <th class="px-3 py-2.5 text-right">WH</th>
-          <th class="px-3 py-2.5 text-right">BD Unsch</th>
-          <th class="px-3 py-2.5 text-right">BD Sch</th>
-          <th class="px-3 py-2.5 text-right">Rain</th>
-          <th class="px-3 py-2.5 text-right">Standby</th>
-          <th class="px-3 py-2.5 text-right">PA (%)</th>
-          <th class="px-3 py-2.5 text-right">MA (%)</th>
-          <th class="px-3 py-2.5 text-right">UA (%)</th>
-          <th class="px-3 py-2.5 text-right">MTTR</th>
+        <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500 select-none">
+          <th onclick="HistoryModule.sortBy('date')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Date ${this.getSortIndicator('date')}</th>
+          <th onclick="HistoryModule.sortBy('dayName')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Day ${this.getSortIndicator('dayName')}</th>
+          <th onclick="HistoryModule.sortBy('unitCount')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Fleet ${this.getSortIndicator('unitCount')}</th>
+          <th onclick="HistoryModule.sortBy('calHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Cal Hrs ${this.getSortIndicator('calHrs')}</th>
+          <th onclick="HistoryModule.sortBy('wh')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">WH ${this.getSortIndicator('wh')}</th>
+          <th onclick="HistoryModule.sortBy('bdUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Unsch ${this.getSortIndicator('bdUnsched')}</th>
+          <th onclick="HistoryModule.sortBy('bdSched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Sch ${this.getSortIndicator('bdSched')}</th>
+          <th onclick="HistoryModule.sortBy('rainHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Rain ${this.getSortIndicator('rainHrs')}</th>
+          <th onclick="HistoryModule.sortBy('stbyHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Standby ${this.getSortIndicator('stbyHrs')}</th>
+          <th onclick="HistoryModule.sortBy('pa')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">PA (%) ${this.getSortIndicator('pa')}</th>
+          <th onclick="HistoryModule.sortBy('ma')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MA (%) ${this.getSortIndicator('ma')}</th>
+          <th onclick="HistoryModule.sortBy('ua')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">UA (%) ${this.getSortIndicator('ua')}</th>
+          <th onclick="HistoryModule.sortBy('mttr')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MTTR ${this.getSortIndicator('mttr')}</th>
+          <th onclick="HistoryModule.sortBy('mtbr')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MTBR ${this.getSortIndicator('mtbr')}</th>
         </tr>`;
-
-      const rows = (this.data.dailyHistory || []).filter((r) => {
-        if (statusFilter === 'PASS' && r.pa < target) return false;
-        if (statusFilter === 'BELOW' && r.pa >= target) return false;
-        if (keyword && !r.date.includes(keyword) && !r.dayName.toLowerCase().includes(keyword)) return false;
-        return true;
-      });
 
       if (countBadge) countBadge.textContent = `${rows.length} Days`;
 
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="13" class="px-4 py-6 text-center text-sm text-slate-400">No historical records found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="14" class="px-4 py-6 text-center text-sm text-slate-400">No historical records found.</td></tr>`;
         tfoot.innerHTML = '';
         return;
       }
 
-      let sumCal = 0, sumWh = 0, sumUnsch = 0, sumSch = 0, sumRain = 0, sumStby = 0;
       tbody.innerHTML = rows
         .map((r) => {
-          sumCal += r.calHrs;
-          sumWh += r.wh;
-          sumUnsch += r.bdUnsched;
-          sumSch += r.bdSched;
-          sumRain += r.rainHrs;
-          sumStby += r.stbyHrs;
+          const mttrVal = Number(r.mttr) || 0;
+          const mtbrVal = r.mtbr !== undefined ? Number(r.mtbr) : Number(r.wh) || 0;
+          const unschCell = r.bdUnsched > 0
+            ? `<button type="button" onclick="HistoryModule.openBdModal('${r.date}', '', 'UNSCHEDULED')" title="Click to inspect Unscheduled BD details" class="text-rose-600 font-bold underline decoration-dotted hover:text-rose-800 cursor-pointer">${r.bdUnsched.toFixed(1)}</button>`
+            : `<span class="text-rose-600">${r.bdUnsched.toFixed(1)}</span>`;
+          const schCell = r.bdSched > 0
+            ? `<button type="button" onclick="HistoryModule.openBdModal('${r.date}', '', 'SCHEDULED')" title="Click to inspect Scheduled BD details" class="text-amber-600 font-bold underline decoration-dotted hover:text-amber-800 cursor-pointer">${r.bdSched.toFixed(1)}</button>`
+            : `<span class="text-amber-600">${r.bdSched.toFixed(1)}</span>`;
 
           return `
             <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
-              <td class="px-3 py-2 font-bold text-slate-800">${r.date}</td>
+              <td class="px-3 py-2 font-bold text-slate-800 whitespace-nowrap">${r.date}</td>
               <td class="px-3 py-2 text-slate-600">${r.dayName}</td>
               <td class="px-3 py-2 text-right">${r.unitCount}</td>
               <td class="px-3 py-2 text-right">${r.calHrs.toFixed(1)}</td>
               <td class="px-3 py-2 text-right font-semibold">${r.wh.toFixed(1)}</td>
-              <td class="px-3 py-2 text-right text-rose-600">${r.bdUnsched.toFixed(1)}</td>
-              <td class="px-3 py-2 text-right text-amber-600">${r.bdSched.toFixed(1)}</td>
+              <td class="px-3 py-2 text-right">${unschCell}</td>
+              <td class="px-3 py-2 text-right">${schCell}</td>
               <td class="px-3 py-2 text-right text-sky-600">${r.rainHrs.toFixed(1)}</td>
               <td class="px-3 py-2 text-right">${r.stbyHrs.toFixed(1)}</td>
               <td class="px-3 py-2 text-right font-bold ${r.pa >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.pa.toFixed(2)}%</td>
               <td class="px-3 py-2 text-right font-bold ${r.ma >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.ma.toFixed(2)}%</td>
               <td class="px-3 py-2 text-right font-bold ${r.ua >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.ua.toFixed(2)}%</td>
-              <td class="px-3 py-2 text-right">${r.mttr.toFixed(2)}h</td>
+              <td class="px-3 py-2 text-right font-medium text-slate-700">${mttrVal.toFixed(2)}h</td>
+              <td class="px-3 py-2 text-right font-medium text-slate-700">${mtbrVal.toFixed(2)}h</td>
             </tr>`;
         })
         .join('');
 
-      const avail = Math.max(0, sumCal - sumUnsch - sumSch);
-      const totPa = sumCal > 0 ? (avail / sumCal) * 100 : 0;
-      const totMa = sumWh + sumUnsch > 0 ? (sumWh / (sumWh + sumUnsch)) * 100 : 100;
-      const totUa = avail > 0 ? (sumWh / avail) * 100 : 0;
-
       tfoot.innerHTML = `
         <tr>
           <td colspan="3" class="px-3 py-2.5 uppercase">Period Total / Average</td>
-          <td class="px-3 py-2.5 text-right">${sumCal.toFixed(1)}</td>
-          <td class="px-3 py-2.5 text-right">${sumWh.toFixed(1)}</td>
-          <td class="px-3 py-2.5 text-right">${sumUnsch.toFixed(1)}</td>
-          <td class="px-3 py-2.5 text-right">${sumSch.toFixed(1)}</td>
-          <td class="px-3 py-2.5 text-right">${sumRain.toFixed(1)}</td>
-          <td class="px-3 py-2.5 text-right">${sumStby.toFixed(1)}</td>
-          <td class="px-3 py-2.5 text-right">${totPa.toFixed(2)}%</td>
-          <td class="px-3 py-2.5 text-right">${totMa.toFixed(2)}%</td>
-          <td class="px-3 py-2.5 text-right">${totUa.toFixed(2)}%</td>
-          <td class="px-3 py-2.5 text-right">-</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumCal.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumWh.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumUnsch.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumSch.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumRain.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumStby.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.totPa.toFixed(2)}%</td>
+          <td class="px-3 py-2.5 text-right">${agg.totMa.toFixed(2)}%</td>
+          <td class="px-3 py-2.5 text-right">${agg.totUa.toFixed(2)}%</td>
+          <td class="px-3 py-2.5 text-right">${agg.totMttr.toFixed(2)}h</td>
+          <td class="px-3 py-2.5 text-right">${agg.totMtbr.toFixed(2)}h</td>
         </tr>`;
     } else {
       thead.innerHTML = `
-        <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500">
-          <th class="px-3 py-2.5">Date</th>
-          <th class="px-3 py-2.5">Unit ID</th>
-          <th class="px-3 py-2.5">Model</th>
-          <th class="px-3 py-2.5 text-right">Cal Hrs</th>
-          <th class="px-3 py-2.5 text-right">WH</th>
-          <th class="px-3 py-2.5 text-right">BD Unsch</th>
-          <th class="px-3 py-2.5 text-right">BD Sch</th>
-          <th class="px-3 py-2.5 text-right">Rain</th>
-          <th class="px-3 py-2.5 text-right">Standby</th>
-          <th class="px-3 py-2.5 text-right">PA (%)</th>
-          <th class="px-3 py-2.5 text-right">MA (%)</th>
-          <th class="px-3 py-2.5 text-right">UA (%)</th>
+        <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500 select-none">
+          <th onclick="HistoryModule.sortBy('date')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Date ${this.getSortIndicator('date')}</th>
+          <th onclick="HistoryModule.sortBy('unitId')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Unit ID ${this.getSortIndicator('unitId')}</th>
+          <th onclick="HistoryModule.sortBy('model')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Model ${this.getSortIndicator('model')}</th>
+          <th onclick="HistoryModule.sortBy('calHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Cal Hrs ${this.getSortIndicator('calHrs')}</th>
+          <th onclick="HistoryModule.sortBy('wh')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">WH ${this.getSortIndicator('wh')}</th>
+          <th onclick="HistoryModule.sortBy('bdUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Unsch ${this.getSortIndicator('bdUnsched')}</th>
+          <th onclick="HistoryModule.sortBy('bdSched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Sch ${this.getSortIndicator('bdSched')}</th>
+          <th onclick="HistoryModule.sortBy('rainHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Rain ${this.getSortIndicator('rainHrs')}</th>
+          <th onclick="HistoryModule.sortBy('stbyHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Standby ${this.getSortIndicator('stbyHrs')}</th>
+          <th onclick="HistoryModule.sortBy('pa')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">PA (%) ${this.getSortIndicator('pa')}</th>
+          <th onclick="HistoryModule.sortBy('ma')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MA (%) ${this.getSortIndicator('ma')}</th>
+          <th onclick="HistoryModule.sortBy('ua')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">UA (%) ${this.getSortIndicator('ua')}</th>
+          <th onclick="HistoryModule.sortBy('mttr')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MTTR ${this.getSortIndicator('mttr')}</th>
+          <th onclick="HistoryModule.sortBy('mtbr')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">MTBR ${this.getSortIndicator('mtbr')}</th>
         </tr>`;
 
-      const rows = (this.data.unitHistory || []).filter((r) => {
-        if (modelFilter !== 'ALL' && r.model !== modelFilter) return false;
-        if (statusFilter === 'PASS' && r.pa < target) return false;
-        if (statusFilter === 'BELOW' && r.pa >= target) return false;
-        if (keyword && !r.date.includes(keyword) && !r.unitId.toLowerCase().includes(keyword) && !r.model.toLowerCase().includes(keyword)) {
-          return false;
-        }
-        return true;
-      });
-
       if (countBadge) countBadge.textContent = `${rows.length} Unit-Days`;
-      tfoot.innerHTML = '';
 
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-sm text-slate-400">No unit history records match the filter.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="14" class="px-4 py-6 text-center text-sm text-slate-400">No unit history records match the filter.</td></tr>`;
+        tfoot.innerHTML = '';
         return;
       }
 
       tbody.innerHTML = rows
         .slice(0, 500)
-        .map(
-          (r) => `
-          <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
-            <td class="px-3 py-2 font-medium text-slate-700">${r.date}</td>
-            <td class="px-3 py-2 font-bold text-slate-900">${r.unitId}</td>
-            <td class="px-3 py-2 text-slate-600">${r.model}</td>
-            <td class="px-3 py-2 text-right">${r.calHrs.toFixed(1)}</td>
-            <td class="px-3 py-2 text-right font-semibold">${r.wh.toFixed(1)}</td>
-            <td class="px-3 py-2 text-right text-rose-600">${r.bdUnsched.toFixed(1)}</td>
-            <td class="px-3 py-2 text-right text-amber-600">${r.bdSched.toFixed(1)}</td>
-            <td class="px-3 py-2 text-right text-sky-600">${r.rainHrs.toFixed(1)}</td>
-            <td class="px-3 py-2 text-right">${r.stbyHrs.toFixed(1)}</td>
-            <td class="px-3 py-2 text-right font-bold ${r.pa >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.pa.toFixed(2)}%</td>
-            <td class="px-3 py-2 text-right font-bold ${r.ma >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.ma.toFixed(2)}%</td>
-            <td class="px-3 py-2 text-right font-bold ${r.ua >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.ua.toFixed(2)}%</td>
-          </tr>`
-        )
+        .map((r) => {
+          const mttrVal = Number(r.mttr) || 0;
+          const mtbrVal = r.mtbr !== undefined ? Number(r.mtbr) : Number(r.wh) || 0;
+          const unschCell = r.bdUnsched > 0
+            ? `<button type="button" onclick="HistoryModule.openBdModal('${r.date}', '${r.unitId}', 'UNSCHEDULED')" title="Click to inspect Unscheduled BD details" class="text-rose-600 font-bold underline decoration-dotted hover:text-rose-800 cursor-pointer">${r.bdUnsched.toFixed(1)}</button>`
+            : `<span class="text-rose-600">${r.bdUnsched.toFixed(1)}</span>`;
+          const schCell = r.bdSched > 0
+            ? `<button type="button" onclick="HistoryModule.openBdModal('${r.date}', '${r.unitId}', 'SCHEDULED')" title="Click to inspect Scheduled BD details" class="text-amber-600 font-bold underline decoration-dotted hover:text-amber-800 cursor-pointer">${r.bdSched.toFixed(1)}</button>`
+            : `<span class="text-amber-600">${r.bdSched.toFixed(1)}</span>`;
+
+          return `
+            <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
+              <td class="px-3 py-2 font-medium text-slate-700 whitespace-nowrap">${r.date}</td>
+              <td class="px-3 py-2 font-bold text-slate-900">${r.unitId}</td>
+              <td class="px-3 py-2 text-slate-600">${r.model}</td>
+              <td class="px-3 py-2 text-right">${r.calHrs.toFixed(1)}</td>
+              <td class="px-3 py-2 text-right font-semibold">${r.wh.toFixed(1)}</td>
+              <td class="px-3 py-2 text-right">${unschCell}</td>
+              <td class="px-3 py-2 text-right">${schCell}</td>
+              <td class="px-3 py-2 text-right text-sky-600">${r.rainHrs.toFixed(1)}</td>
+              <td class="px-3 py-2 text-right">${r.stbyHrs.toFixed(1)}</td>
+              <td class="px-3 py-2 text-right font-bold ${r.pa >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.pa.toFixed(2)}%</td>
+              <td class="px-3 py-2 text-right font-bold ${r.ma >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.ma.toFixed(2)}%</td>
+              <td class="px-3 py-2 text-right font-bold ${r.ua >= target ? 'text-emerald-600' : 'text-rose-600'}">${r.ua.toFixed(2)}%</td>
+              <td class="px-3 py-2 text-right font-medium text-slate-700">${mttrVal.toFixed(2)}h</td>
+              <td class="px-3 py-2 text-right font-medium text-slate-700">${mtbrVal.toFixed(2)}h</td>
+            </tr>`;
+        })
         .join('');
+
+      tfoot.innerHTML = `
+        <tr>
+          <td colspan="3" class="px-3 py-2.5 uppercase">Filtered Total / Average (${rows.length} Unit-Days)</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumCal.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumWh.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumUnsch.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumSch.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumRain.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumStby.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.totPa.toFixed(2)}%</td>
+          <td class="px-3 py-2.5 text-right">${agg.totMa.toFixed(2)}%</td>
+          <td class="px-3 py-2.5 text-right">${agg.totUa.toFixed(2)}%</td>
+          <td class="px-3 py-2.5 text-right">${agg.totMttr.toFixed(2)}h</td>
+          <td class="px-3 py-2.5 text-right">${agg.totMtbr.toFixed(2)}h</td>
+        </tr>`;
     }
   },
 
@@ -1210,17 +1417,46 @@ const HistoryModule = {
     const btn = document.getElementById('btn-hist-export-csv');
     const mode = document.getElementById('hist-view-mode')?.value || 'DAILY';
     const monthVal = this.data.month || 'history';
+    const rowsToExport = this.getFilteredRows();
 
     if (mode === 'DAILY') {
-      const headers = ['Site', 'Date', 'Day', 'Fleet_Size', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs'];
-      const rows = (this.data.dailyHistory || []).map((r) => [
-        AuthModule.currentSite, r.date, r.dayName, r.unitCount, r.calHrs, r.wh, r.bdUnsched, r.bdSched, r.rainHrs, r.stbyHrs, r.pa, r.ma, r.ua, r.mttr
+      const headers = ['Site', 'Date', 'Day', 'Fleet_Size', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
+      const rows = rowsToExport.map((r) => [
+        AuthModule.currentSite,
+        r.date,
+        r.dayName,
+        r.unitCount,
+        r.calHrs,
+        r.wh,
+        r.bdUnsched,
+        r.bdSched,
+        r.rainHrs,
+        r.stbyHrs,
+        r.pa,
+        r.ma,
+        r.ua,
+        (Number(r.mttr) || 0).toFixed(2),
+        (r.mtbr !== undefined ? Number(r.mtbr) : Number(r.wh) || 0).toFixed(2)
       ]);
       downloadCsvFile(`MPS_Daily_History_${AuthModule.currentSite}_${monthVal}.csv`, headers, rows, btn);
     } else {
-      const headers = ['Site', 'Date', 'Unit_ID', 'Model', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct'];
-      const rows = (this.data.unitHistory || []).map((r) => [
-        AuthModule.currentSite, r.date, r.unitId, r.model, r.calHrs, r.wh, r.bdUnsched, r.bdSched, r.rainHrs, r.stbyHrs, r.pa, r.ma, r.ua
+      const headers = ['Site', 'Date', 'Unit_ID', 'Model', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
+      const rows = rowsToExport.map((r) => [
+        AuthModule.currentSite,
+        r.date,
+        r.unitId,
+        r.model,
+        r.calHrs,
+        r.wh,
+        r.bdUnsched,
+        r.bdSched,
+        r.rainHrs,
+        r.stbyHrs,
+        r.pa,
+        r.ma,
+        r.ua,
+        (Number(r.mttr) || 0).toFixed(2),
+        (r.mtbr !== undefined ? Number(r.mtbr) : Number(r.wh) || 0).toFixed(2)
       ]);
       downloadCsvFile(`MPS_Unit_History_${AuthModule.currentSite}_${monthVal}.csv`, headers, rows, btn);
     }
