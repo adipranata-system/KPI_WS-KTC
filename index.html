@@ -525,6 +525,18 @@
             </div>
 
             <div>
+              <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Specific Date</label>
+              <div class="flex items-center gap-1">
+                <input type="date" id="hist-date-filter" onchange="HistoryModule.render()"
+                  class="px-2.5 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-500" />
+                <button type="button" onclick="HistoryModule.clearDateFilter()" title="Clear Date Filter"
+                  class="px-2 py-1.5 text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border border-slate-200 transition">
+                  &times;
+                </button>
+              </div>
+            </div>
+
+            <div>
               <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">PA Target Status</label>
               <select id="hist-filter-status" onchange="HistoryModule.render()"
                 class="px-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
@@ -548,10 +560,46 @@
           </button>
         </div>
 
+        <!-- Mini Summary Strip (Dynamic Filtered Period KPIs) -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+            <div class="text-[10px] font-bold text-slate-400 uppercase">Filtered Working (WH)</div>
+            <div id="hist-sum-wh" class="text-lg font-extrabold text-slate-900 mt-0.5">0.0 Hrs</div>
+            <div id="hist-sum-cal" class="text-[11px] text-slate-500">of 0.0 Cal Hrs</div>
+          </div>
+
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+            <div class="text-[10px] font-bold text-slate-400 uppercase">BD Unsched / Sched</div>
+            <div id="hist-sum-bd" class="text-lg font-extrabold text-rose-600 mt-0.5">0.0h / 0.0h</div>
+            <div id="hist-sum-freq" class="text-[11px] text-slate-500">0 Unsched Events</div>
+          </div>
+
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+            <div class="text-[10px] font-bold text-slate-400 uppercase">Filtered PA (%)</div>
+            <div id="hist-sum-pa" class="text-lg font-extrabold text-slate-900 mt-0.5">0.00%</div>
+            <div class="text-[11px] text-slate-500">Target &ge; 85.0%</div>
+          </div>
+
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+            <div class="text-[10px] font-bold text-slate-400 uppercase">Filtered MA (%)</div>
+            <div id="hist-sum-ma" class="text-lg font-extrabold text-slate-900 mt-0.5">0.00%</div>
+            <div class="text-[11px] text-slate-500">Target &ge; 85.0%</div>
+          </div>
+
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 col-span-2 md:col-span-1">
+            <div class="text-[10px] font-bold text-slate-400 uppercase">Avg MTTR / MTBR</div>
+            <div id="hist-sum-reliability" class="text-lg font-extrabold text-slate-900 mt-0.5">0.00h / 0.00h</div>
+            <div class="text-[11px] text-slate-500">Repair vs Between BD</div>
+          </div>
+        </div>
+
         <!-- History Table -->
         <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
-            <span id="hist-status-msg" class="text-xs text-slate-500">Select a month to view KPI history...</span>
+          <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <span id="hist-status-msg" class="text-xs text-slate-500">Select a month to view KPI history...</span>
+              <span class="hidden sm:inline text-[11px] text-slate-400 ml-2">&bull; Click headers to sort &bull; Click BD hours to inspect breakdown logs</span>
+            </div>
             <span id="hist-row-count" class="px-2.5 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded-full">0 Rows</span>
           </div>
           <div class="overflow-x-auto max-h-[36rem]">
@@ -563,6 +611,46 @@
           </div>
         </div>
       </section>
+
+      <!-- Breakdown Details Modal (Triggered when clicking BD Unsch / BD Sch hours in History) -->
+      <div id="modal-hist-bd-details" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+          <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div>
+              <h3 id="modal-hist-bd-title" class="text-sm font-extrabold uppercase tracking-wide">Breakdown Incident Details</h3>
+              <p id="modal-hist-bd-subtitle" class="text-[11px] text-slate-300 mt-0.5">Logged breakdown records for selected date / unit</p>
+            </div>
+            <button type="button" onclick="HistoryModule.closeBdModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+          </div>
+
+          <div class="p-4 max-h-[28rem] overflow-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-100 border-b border-slate-200 text-[10px] uppercase text-slate-600">
+                <tr>
+                  <th class="px-2.5 py-2">Date</th>
+                  <th class="px-2.5 py-2">Unit ID</th>
+                  <th class="px-2.5 py-2">Model</th>
+                  <th class="px-2.5 py-2">WO</th>
+                  <th class="px-2.5 py-2">Code</th>
+                  <th class="px-2.5 py-2">Time IN - OUT</th>
+                  <th class="px-2.5 py-2 text-right">Pure BD</th>
+                  <th class="px-2.5 py-2">Component</th>
+                  <th class="px-2.5 py-2">Problem Description</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-hist-bd-modal"></tbody>
+            </table>
+          </div>
+
+          <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+            <span id="modal-hist-bd-total" class="font-bold text-slate-800">Total Logged Pure BD: 0.00 Hrs</span>
+            <button type="button" onclick="HistoryModule.closeBdModal()"
+              class="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold rounded-lg transition">
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- ===================================================== -->
       <!-- TAB 3: UPLOAD BREAKDOWN REPORT                        -->
@@ -1665,7 +1753,7 @@
             <!-- Footer Kredit Sistem Digital Workshop -->
             <div class="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
               <div>
-                Generated automatically by <strong class="text-slate-700">Machine Performance System (MPS)</strong> &mdash; Digital Fleet Reliability &amp; KPI Intelligence developed at <strong class="text-slate-700">PT. KTC Coal Mining &amp; Energy Workshop</strong> by <strong class="text-slate-700">Adi Pranata</strong>.
+                Generated automatically by <strong class="text-slate-700">Machine Performance System (MPS) v2.0</strong> &mdash; Digital Fleet Reliability &amp; KPI Intelligence developed at <strong class="text-slate-700">PT. KTC Coal Mining &amp; Energy Workshop</strong> by <strong class="text-slate-700">Adi Pranata</strong>.
               </div>
               <div class="font-semibold text-slate-600">
                 CONFIDENTIAL &bull; INTERNAL MANAGEMENT REPORT
@@ -1695,7 +1783,7 @@
   </div>
 
   <!-- External Application Logic Bundle (Split into Core + Report/PDF Module) -->
-  <script src="app.js?v=12"></script>
-  <script src="report-pdf.js?v=11"></script>
+  <script src="app.js?v=13"></script>
+  <script src="report-pdf.js?v=13"></script>
 </body>
 </html>
