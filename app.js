@@ -1888,10 +1888,10 @@ const InputHmModule = {
     NIGHT: []
   },
 
-  formatIndoShortDate(ymd) {
+  formatShortDate(ymd) {
     if (!ymd || !/^\d{4}-\d{2}-\d{2}/.test(String(ymd))) return String(ymd || '');
     const [y, m, d] = String(ymd).slice(0, 10).split('-').map(Number);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     return `${String(d).padStart(2, '0')} ${months[(m - 1) || 0]} ${y}`;
   },
 
@@ -2101,7 +2101,7 @@ const InputHmModule = {
       this.toggleShiftWorking(shiftName, true);
     }
 
-    // Hanya isi unit berstatus 'W' (Working); unit 'SW' (Standby Working) tidak di-autofill
+    // Only auto-fill units with status 'W' (Working); 'SW' (Standby Working) units remain Standby
     const workingUnits = (AuthModule.masterData.units || []).filter(
       (u) => String(u.status || '').trim().toUpperCase() === 'W'
     );
@@ -2337,7 +2337,7 @@ const InputHmModule = {
     } else if (this.lastHmInfoMap[row.unitId]?.date) {
       lastDateRaw = this.lastHmInfoMap[row.unitId].date;
     }
-    const lastDateText = lastDateRaw ? this.formatIndoShortDate(lastDateRaw) : 'sebelumnya';
+    const lastDateText = lastDateRaw ? this.formatShortDate(lastDateRaw) : 'prior log';
 
     let isDateSkipped = false;
     if (lastDateRaw && this.selectedDate && lastDateRaw < this.selectedDate) {
@@ -2353,7 +2353,7 @@ const InputHmModule = {
             <input type="checkbox" ${row.hmReset ? 'checked' : ''}
               onchange="InputHmModule.toggleRowHmReset('${shiftName}', ${idx}, this.checked)"
               class="w-3 h-3 text-indigo-600 rounded" />
-            <span>Unit Ganti Hourmeter (HM Reset)</span>
+            <span>Hourmeter Replaced (HM Reset)</span>
           </label>
         </div>`
       : '';
@@ -2369,12 +2369,12 @@ const InputHmModule = {
 
     if (!isNaN(start) && expectedStart !== null) {
       if (gap < 0 && !row.hmReset) {
-        return `<span class="text-[11px] font-bold text-rose-600">HM Awal (${start}) &lt; HM Akhir sblmnya (${expectedStart})! Klik &#9881; jika ganti meteran.</span>${settingsHtml}`;
+        return `<span class="text-[11px] font-bold text-rose-600">Start HM (${start}) &lt; Prev End (${expectedStart})! Click &#9881; if meter replaced.</span>${settingsHtml}`;
       }
       if (row.hmReset) {
-        badges.push(`<span class="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">&#128260; HM Reset (dari ${expectedStart})</span>`);
+        badges.push(`<span class="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">&#128260; HM Reset (from ${expectedStart})</span>`);
       } else if (gap > 0) {
-        badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; Terdeteksi selisih +${gap.toFixed(1)}j dari HM akhir ${expectedStart} (diisi Tgl ${lastDateText})</span>`);
+        badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; +${gap.toFixed(1)}h gap from Prev HM ${expectedStart} (${lastDateText})</span>`);
       }
     }
 
@@ -2385,7 +2385,7 @@ const InputHmModule = {
       } else if (diff > maxQuota) {
         badges.push(`<span class="text-[11px] font-bold text-rose-600">Exceeds ${maxQuota}h quota!</span>`);
         if (gap === 0 && expectedStart !== null && !row.hmReset) {
-          badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; Terdeteksi selisih +${diff.toFixed(1)}j dari HM akhir ${expectedStart} (diisi Tgl ${lastDateText})</span>`);
+          badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; +${diff.toFixed(1)}h gap from Prev HM ${expectedStart} (${lastDateText})</span>`);
         }
       } else {
         const rem = Math.max(0, Math.round((maxQuota - diff - (bdInfo?.hours || 0)) * 100) / 100);
@@ -2393,7 +2393,7 @@ const InputHmModule = {
       }
     } else if (expectedStart !== null && !row.hmReset && gap === 0) {
       if (isDateSkipped) {
-        badges.push(`<span class="px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 font-semibold rounded text-[10px]">Prev: ${expectedStart} (diisi Tgl ${lastDateText})</span>`);
+        badges.push(`<span class="px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 font-semibold rounded text-[10px]">Prev: ${expectedStart} (${lastDateText})</span>`);
       } else {
         badges.push(`<span class="text-[10px] text-blue-600">Prev: ${expectedStart} (${lastDateText})</span>`);
       }
@@ -2486,7 +2486,7 @@ const InputHmModule = {
             </td>
             <td class="px-2 py-1.5 text-center whitespace-nowrap">
               <button type="button" tabindex="-1" onclick="InputHmModule.toggleRowSettings('${shiftName}', ${idx})"
-                title="Pengaturan HM Unit (Reset Hourmeter)"
+                title="Hourmeter Settings (HM Reset)"
                 class="${row.hmReset ? 'text-indigo-700 bg-indigo-100' : 'text-slate-400 hover:text-slate-700'} px-1 py-0.5 rounded transition">
                 &#9881;
               </button>
@@ -2721,7 +2721,7 @@ const PopulationModule = {
       this.isMaterialized = Boolean(res.isMaterialized);
       this.inheritedFrom = res.inheritedFrom || '';
 
-      // Sinkronkan masterData bulan berjalan jika periode sama dengan bulan aktif
+      // Synchronize current month masterData if selected period matches active month
       const now = new Date();
       const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
       if (targetMonth === curYM) {
@@ -2777,7 +2777,7 @@ const PopulationModule = {
 
     if (banner && desc) {
       desc.textContent = isOverrideActive
-        ? 'Mode Override Superadmin aktif: Anda dapat mengubah status unit mana pun (W, SW, OH, S) kapan saja. Wajib isi alasan teknis pada baris unit yang diubah untuk jejak audit.'
+        ? 'Superadmin Override Mode active: You may change any unit status (W, SW, OH, S) at any time. Technical justification is required on modified rows for audit logs.'
         : (this.lockState.description || '');
       banner.className = isOverrideActive
         ? 'p-3 rounded-lg bg-rose-50 border border-rose-300 text-xs text-rose-950 flex flex-wrap items-center justify-between gap-2'
@@ -2944,19 +2944,16 @@ const PopulationModule = {
           S: 'border-rose-300 bg-rose-50 text-rose-700'
         }[u.status] || 'border-slate-300 bg-white';
 
-        // Tentukan opsi dropdown sesuai aturan penguncian bulan
+        // Determine allowed dropdown options based on monthly lock state
         let allowedOptions = statusOptions;
         let disableSelect = isFrozen;
 
         if (isMidMonthLocked) {
           if (isOnHired && u._origStatus && ['W', 'SW'].includes(u._origStatus)) {
-            // Unit On-Hired terkunci W/SW hingga akhir bulan
             allowedOptions = statusOptions.filter((o) => ['W', 'SW'].includes(o.val));
           } else if (isOnHired && !['W', 'SW'].includes(u._origStatus)) {
-            // Baru ditarik darurat dari OH -> terkunci W/SW
             allowedOptions = statusOptions.filter((o) => ['W', 'SW'].includes(o.val));
           } else {
-            // OH atau S tidak bisa diubah langsung lewat dropdown saat terkunci
             disableSelect = true;
           }
         }
@@ -2965,14 +2962,14 @@ const PopulationModule = {
           .map((o) => `<option value="${o.val}" ${u.status === o.val ? 'selected' : ''}>${o.label}</option>`)
           .join('');
 
-        // Kolom Governance & Catatan Mutasi
+        // Governance & Mutation Notes Column
         let govHtml = '';
         if (isOverrideActive && u.status !== u._origStatus) {
           govHtml += `<div class="space-y-1">
             <span class="inline-block px-2 py-0.5 text-[10px] font-extrabold bg-rose-600 text-white rounded">FORCE OVERRIDE (${u._origStatus} &rarr; ${u.status})</span>
             <input type="text" value="${(u.reason || '').replace(/"/g, '&quot;')}"
               oninput="PopulationModule.onOverrideReasonChange('${u.unitId}', this.value)"
-              placeholder="Wajib isi alasan teknis override..."
+              placeholder="Technical reason required for override..."
               class="w-full px-2 py-1 text-[11px] border border-rose-300 rounded bg-white focus:outline-none focus:border-rose-600" />
           </div>`;
         } else if (u.pendingOffHire) {
@@ -3206,7 +3203,7 @@ const PopulationModule = {
     if (isOverrideActive) {
       const missingReason = changedUnits.find((u) => u.status !== u._origStatus && !String(u.reason || '').trim());
       if (missingReason) {
-        showToast(`Wajib isi alasan teknis override untuk unit ${missingReason.unitId} sebelum menyimpan.`, 'error');
+        showToast(`Technical override reason is required for unit ${missingReason.unitId} before saving.`, 'error');
         return;
       }
     }
