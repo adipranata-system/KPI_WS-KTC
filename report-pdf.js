@@ -1783,6 +1783,11 @@ function getDemoApiResponse(action, payload, session) {
       },
       operations: { DAY: [], NIGHT: [] },
       lastHmMap: { 'EX-1320': 14250.5, 'EX-1351': 11890.0, 'DT-4012': 22410.0 },
+      lastHmInfoMap: {
+        'EX-1320': { hmEnd: 14250.5, date: '2026-11-12' },
+        'EX-1351': { hmEnd: 11890.0, date: '2026-11-13' },
+        'DT-4012': { hmEnd: 22410.0, date: '2026-11-13' }
+      },
       breakdownMap: { DAY: {}, NIGHT: {} },
       monthlyStatus: { '2026-11-12': 'COMPLETE', '2026-11-13': 'COMPLETE', '2026-11-14': 'BD_ONLY' }
     };
