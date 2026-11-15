@@ -2326,6 +2326,27 @@ const InputHmModule = {
     const start = parseFloat(row.hmStart);
     const end = parseFloat(row.hmEnd);
 
+    let lastDateRaw = '';
+    if (shiftName === 'NIGHT') {
+      const dayRow = this.operations.DAY.find((r) => String(r.unitId || '').trim() === String(row.unitId || '').trim());
+      if (dayRow && dayRow.hmEnd !== '' && !isNaN(parseFloat(dayRow.hmEnd))) {
+        lastDateRaw = this.selectedDate;
+      } else if (this.lastHmInfoMap[row.unitId]?.date) {
+        lastDateRaw = this.lastHmInfoMap[row.unitId].date;
+      }
+    } else if (this.lastHmInfoMap[row.unitId]?.date) {
+      lastDateRaw = this.lastHmInfoMap[row.unitId].date;
+    }
+    const lastDateText = lastDateRaw ? this.formatIndoShortDate(lastDateRaw) : 'sebelumnya';
+
+    let isDateSkipped = false;
+    if (lastDateRaw && this.selectedDate && lastDateRaw < this.selectedDate) {
+      const p1 = lastDateRaw.split('-').map(Number);
+      const p2 = this.selectedDate.split('-').map(Number);
+      const diffDays = Math.round((new Date(p2[0], p2[1] - 1, p2[2]) - new Date(p1[0], p1[1] - 1, p1[2])) / 86400000);
+      if (diffDays > 1) isDateSkipped = true;
+    }
+
     const settingsHtml = row.showSettings
       ? `<div class="mt-1.5 pt-1.5 border-t border-slate-200">
           <label class="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-indigo-50 border border-indigo-200 text-[10px] font-bold text-indigo-950 cursor-pointer select-none">
@@ -2342,25 +2363,17 @@ const InputHmModule = {
       badges.push(`<span class="px-1.5 py-0.5 bg-rose-100 text-rose-700 font-bold rounded text-[10px]">BD ${bdInfo.hours}h (${bdInfo.codes.join('/')})</span>`);
     }
 
+    const gap = (!isNaN(start) && expectedStart !== null)
+      ? Math.round((start - expectedStart) * 100) / 100
+      : 0;
+
     if (!isNaN(start) && expectedStart !== null) {
-      const gap = Math.round((start - expectedStart) * 100) / 100;
       if (gap < 0 && !row.hmReset) {
         return `<span class="text-[11px] font-bold text-rose-600">HM Awal (${start}) &lt; HM Akhir sblmnya (${expectedStart})! Klik &#9881; jika ganti meteran.</span>${settingsHtml}`;
       }
       if (row.hmReset) {
         badges.push(`<span class="px-1.5 py-0.5 bg-indigo-100 text-indigo-800 font-bold rounded text-[10px]">&#128260; HM Reset (dari ${expectedStart})</span>`);
       } else if (gap > 0) {
-        let lastDateText = 'sebelumnya';
-        if (shiftName === 'NIGHT') {
-          const dayRow = this.operations.DAY.find((r) => String(r.unitId || '').trim() === String(row.unitId || '').trim());
-          if (dayRow && dayRow.hmEnd !== '' && !isNaN(parseFloat(dayRow.hmEnd))) {
-            lastDateText = this.formatIndoShortDate(this.selectedDate);
-          } else if (this.lastHmInfoMap[row.unitId]?.date) {
-            lastDateText = this.formatIndoShortDate(this.lastHmInfoMap[row.unitId].date);
-          }
-        } else if (this.lastHmInfoMap[row.unitId]?.date) {
-          lastDateText = this.formatIndoShortDate(this.lastHmInfoMap[row.unitId].date);
-        }
         badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; Terdeteksi selisih +${gap.toFixed(1)}j dari HM akhir ${expectedStart} (diisi Tgl ${lastDateText})</span>`);
       }
     }
@@ -2368,15 +2381,22 @@ const InputHmModule = {
     if (!isNaN(start) && !isNaN(end)) {
       const diff = Math.round((end - start) * 100) / 100;
       if (diff < 0) {
-        return `<span class="text-[11px] font-bold text-rose-600">End HM &lt; Start HM!</span>${settingsHtml}`;
+        badges.push(`<span class="text-[11px] font-bold text-rose-600">End HM &lt; Start HM!</span>`);
+      } else if (diff > maxQuota) {
+        badges.push(`<span class="text-[11px] font-bold text-rose-600">Exceeds ${maxQuota}h quota!</span>`);
+        if (gap === 0 && expectedStart !== null && !row.hmReset) {
+          badges.push(`<span class="px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; Terdeteksi selisih +${diff.toFixed(1)}j dari HM akhir ${expectedStart} (diisi Tgl ${lastDateText})</span>`);
+        }
+      } else {
+        const rem = Math.max(0, Math.round((maxQuota - diff - (bdInfo?.hours || 0)) * 100) / 100);
+        badges.push(`<span class="text-[11px] text-slate-500">${rem > 0 ? `Stby ${rem}h` : 'Full'}</span>`);
       }
-      if (diff > maxQuota) {
-        return `<span class="text-[11px] font-bold text-rose-600">Exceeds ${maxQuota}h quota!</span>${settingsHtml}`;
+    } else if (expectedStart !== null && !row.hmReset && gap === 0) {
+      if (isDateSkipped) {
+        badges.push(`<span class="px-1.5 py-0.5 bg-amber-50 text-amber-900 border border-amber-200 font-semibold rounded text-[10px]">Prev: ${expectedStart} (diisi Tgl ${lastDateText})</span>`);
+      } else {
+        badges.push(`<span class="text-[10px] text-blue-600">Prev: ${expectedStart} (${lastDateText})</span>`);
       }
-      const rem = Math.max(0, Math.round((maxQuota - diff - (bdInfo?.hours || 0)) * 100) / 100);
-      badges.push(`<span class="text-[11px] text-slate-500">${rem > 0 ? `Stby ${rem}h` : 'Full'}</span>`);
-    } else if (expectedStart !== null && !row.hmReset) {
-      badges.push(`<span class="text-[10px] text-blue-600">Prev: ${expectedStart}</span>`);
     }
 
     const baseHtml = badges.length > 0 ? badges.join(' ') : '<span class="text-[11px] text-slate-400">-</span>';
