@@ -2998,6 +2998,7 @@ const PopulationModule = {
       badge.textContent = isOverrideActive ? 'SUPERADMIN FORCE OVERRIDE ACTIVE' : (this.lockState.label || mode);
       const badgeStyles = {
         PLANNING: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-indigo-100 text-indigo-800 border border-indigo-200',
+        NEXT_MONTH_LOCKED: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-amber-100 text-amber-900 border border-amber-300',
         GRACE_PERIOD: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-200',
         LOCKED_MID_MONTH: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-amber-100 text-amber-900 border border-amber-300',
         HISTORICAL_FROZEN: 'px-3 py-1.5 text-xs font-extrabold rounded-lg bg-slate-200 text-slate-700 border border-slate-300'
@@ -3019,7 +3020,7 @@ const PopulationModule = {
         : (this.lockState.description || '');
       banner.className = isOverrideActive
         ? 'p-3 rounded-lg bg-rose-50 border border-rose-300 text-xs text-rose-950 flex flex-wrap items-center justify-between gap-2'
-        : mode === 'LOCKED_MID_MONTH'
+        : (mode === 'LOCKED_MID_MONTH' || mode === 'NEXT_MONTH_LOCKED')
         ? 'p-3 rounded-lg bg-amber-50/80 border border-amber-200 text-xs text-amber-950 flex flex-wrap items-center justify-between gap-2'
         : 'p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-700 flex flex-wrap items-center justify-between gap-2';
 
@@ -3047,7 +3048,7 @@ const PopulationModule = {
       btnCopy.disabled = Boolean(this.lockState.isLocked) && !isOverrideActive;
     }
     if (btnSave) {
-      btnSave.disabled = mode === 'HISTORICAL_FROZEN' && !isOverrideActive;
+      btnSave.disabled = (mode === 'HISTORICAL_FROZEN' || mode === 'NEXT_MONTH_LOCKED') && !isOverrideActive;
     }
   },
 
@@ -3147,7 +3148,7 @@ const PopulationModule = {
     const mode = this.lockState.mode || 'GRACE_PERIOD';
     const isOverrideActive = this.isSuperadmin() && this.forceOverride;
     const isMidMonthLocked = mode === 'LOCKED_MID_MONTH' && !isOverrideActive;
-    const isFrozen = mode === 'HISTORICAL_FROZEN' && !isOverrideActive;
+    const isFrozen = (mode === 'HISTORICAL_FROZEN' || mode === 'NEXT_MONTH_LOCKED') && !isOverrideActive;
 
     const statusOptions = [
       { val: 'W', label: 'W (Working - On-Hired)' },
@@ -3228,6 +3229,8 @@ const PopulationModule = {
           </button>`;
         } else if (isScrap) {
           govHtml += `<span class="text-[11px] text-slate-400 italic">Decommissioned / Excluded from KPI</span>`;
+        } else if (mode === 'NEXT_MONTH_LOCKED' && !isOverrideActive) {
+          govHtml += `<span class="text-[11px] text-amber-800 italic">Next month planning opens on Day 25</span>`;
         } else {
           govHtml += `<span class="text-[11px] text-slate-400">Standby Yard / Long-Term BD (Excluded)</span>`;
         }
@@ -3432,6 +3435,7 @@ const PopulationModule = {
           ADDITIONAL_FLEET: 'bg-teal-100 text-teal-800',
           PENDING_OFF_HIRE: 'bg-amber-100 text-amber-900',
           CANCEL_PENDING_OH: 'bg-slate-200 text-slate-700',
+          SMART_SYNC_NEXT_MONTH: 'bg-cyan-100 text-cyan-800',
           COPY_ROSTER: 'bg-emerald-100 text-emerald-800'
         }[l.actionType] || 'bg-blue-100 text-blue-800';
 
@@ -3477,8 +3481,13 @@ const PopulationModule = {
 
   async saveBulkStatus(forceSave = false) {
     const isOverrideActive = this.isSuperadmin() && this.forceOverride;
-    if (this.lockState.mode === 'HISTORICAL_FROZEN' && !isOverrideActive) {
-      showToast('Historical roster period is permanently locked.', 'error');
+    if ((this.lockState.mode === 'HISTORICAL_FROZEN' || this.lockState.mode === 'NEXT_MONTH_LOCKED') && !isOverrideActive) {
+      showToast(
+        this.lockState.mode === 'NEXT_MONTH_LOCKED'
+          ? 'Next month planning for Planner opens on Day 25 of the current month.'
+          : 'Historical roster period is permanently locked.',
+        'error'
+      );
       return;
     }
 
