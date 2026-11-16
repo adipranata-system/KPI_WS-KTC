@@ -2945,7 +2945,9 @@ const PopulationModule = {
         _origStatus: u.status,
         _origPending: Boolean(u.pendingOffHire),
         _origReplaced: u.replacedUnitId || '',
-        _origReason: u.reason || ''
+        _origReason: u.reason || '',
+        _origEffectiveDate: u.effectiveDate || '',
+        pullInType: u.pullInType || ''
       }));
       this.auditLogs = res.auditLogs || [];
       this.lockState = res.lockState || {
@@ -3163,7 +3165,8 @@ const PopulationModule = {
           u.status !== u._origStatus ||
           Boolean(u.pendingOffHire) !== u._origPending ||
           (u.replacedUnitId || '') !== u._origReplaced ||
-          (u.reason || '') !== u._origReason;
+          (u.reason || '') !== u._origReason ||
+          (u.effectiveDate || '') !== (u._origEffectiveDate || '');
 
         const rowCls = isModified
           ? 'bg-blue-50/60'
@@ -3219,9 +3222,9 @@ const PopulationModule = {
             Schedule Pending Off-Hire
           </button>`;
         } else if (isOffHired && isMidMonthLocked) {
-          govHtml += `<button type="button" onclick="PopulationModule.openActionModal('${u.unitId}', 'EMERGENCY_PULL_IN')"
+          govHtml += `<button type="button" onclick="PopulationModule.openActionModal('${u.unitId}', 'PULL_IN_OH')"
             class="px-2.5 py-1 text-[11px] font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-xs transition">
-            &#9889; Emergency Pull-In (OH &rarr; W)
+            &#9889; Pull-In Unit (OH &rarr; W/SW)
           </button>`;
         } else if (isScrap) {
           govHtml += `<span class="text-[11px] text-slate-400 italic">Decommissioned / Excluded from KPI</span>`;
@@ -3229,7 +3232,12 @@ const PopulationModule = {
           govHtml += `<span class="text-[11px] text-slate-400">Standby Yard / Long-Term BD (Excluded)</span>`;
         }
 
-        if (u.replacedUnitId) {
+        if (u.effectiveDate) {
+          govHtml += `<span class="inline-block px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 rounded mt-1 mr-1">Effective: ${u.effectiveDate}</span>`;
+        }
+        if (u.pullInType === 'ADDITIONAL_FLEET' || (!u.replacedUnitId && u.effectiveDate && isOnHired)) {
+          govHtml += `<span class="inline-block px-2 py-0.5 text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200 rounded mt-1">Additional Fleet Expansion</span>`;
+        } else if (u.replacedUnitId) {
           govHtml += `<div class="text-[11px] font-bold text-indigo-700 mt-1">Replaces Unit: ${u.replacedUnitId}</div>`;
         }
         if (u.reason && !(isOverrideActive && u.status !== u._origStatus)) {
@@ -3281,6 +3289,22 @@ const PopulationModule = {
     showToast(`Pending Off-Hire cancelled for ${unitId}. Click "Save Roster Changes" to confirm.`, 'info');
   },
 
+  onPullInTypeChange(pullType) {
+    const replacedWrap = document.getElementById('modal-roster-replaced-wrap');
+    const reasonInput = document.getElementById('modal-roster-reason');
+    const isAdditional = pullType === 'ADDITIONAL_FLEET';
+
+    if (replacedWrap) {
+      if (isAdditional) replacedWrap.classList.add('hidden');
+      else replacedWrap.classList.remove('hidden');
+    }
+    if (reasonInput) {
+      reasonInput.placeholder = isAdditional
+        ? 'e.g., Additional fleet requested by Production for Pit South expansion (Memo #108)...'
+        : 'e.g., Replacing broken unit EX-1320 due to hydraulic pump failure (WO #4412)...';
+    }
+  },
+
   openActionModal(unitId, actionMode) {
     const unit = this.rosterUnits.find((u) => u.unitId === unitId);
     if (!unit) return;
@@ -3289,6 +3313,8 @@ const PopulationModule = {
     const title = document.getElementById('modal-roster-title');
     const subtitle = document.getElementById('modal-roster-subtitle');
     const pullFields = document.getElementById('modal-roster-pull-fields');
+    const pullTypeSelect = document.getElementById('modal-roster-pull-type');
+    const effDateInput = document.getElementById('modal-roster-effective-date');
     const replacedSelect = document.getElementById('modal-roster-replaced-unit');
     const reasonInput = document.getElementById('modal-roster-reason');
 
@@ -3300,11 +3326,32 @@ const PopulationModule = {
     if (actionMode === 'PENDING_OH') {
       if (title) title.textContent = 'Schedule Pending Off-Hire (Effective 1st Next Month)';
       if (subtitle) subtitle.textContent = 'Unit remains On-Hired until end of current month to preserve honest KPI accountability.';
+      if (reasonInput) {
+        reasonInput.placeholder = 'e.g., Major hydraulic pump failure (WO #4412) - scheduled for Off-Hire effective 1st of next month...';
+      }
       pullFields?.classList.add('hidden');
     } else {
-      if (title) title.textContent = 'Emergency Pull-In Replacement (Off-Hired to On-Hired)';
-      if (subtitle) subtitle.textContent = 'Activated unit will be locked as On-Hired through the end of this month.';
+      if (title) title.textContent = 'Pull-In Off-Hired Unit (OH to W / SW)';
+      if (subtitle) subtitle.textContent = 'Select Replacement or Additional Fleet Expansion. Unit will lock as On-Hired through month-end.';
       pullFields?.classList.remove('hidden');
+
+      if (pullTypeSelect) {
+        pullTypeSelect.value = 'REPLACEMENT';
+        this.onPullInTypeChange('REPLACEMENT');
+      }
+
+      if (effDateInput && this.selectedMonth) {
+        const [yStr, mStr] = this.selectedMonth.split('-');
+        const lastDay = new Date(Number(yStr), Number(mStr), 0).getDate();
+        const minDate = `${this.selectedMonth}-01`;
+        const maxDate = `${this.selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+        effDateInput.min = minDate;
+        effDateInput.max = maxDate;
+        effDateInput.value = todayStr >= minDate && todayStr <= maxDate ? todayStr : minDate;
+      }
 
       if (replacedSelect) {
         const onHiredUnits = this.rosterUnits.filter((u) => ['W', 'SW'].includes(u.status) && u.unitId !== unitId);
@@ -3336,15 +3383,26 @@ const PopulationModule = {
     if (actionMode === 'PENDING_OH') {
       target.pendingOffHire = true;
       target.reason = reason;
-    } else if (actionMode === 'EMERGENCY_PULL_IN') {
+    } else if (actionMode === 'PULL_IN_OH' || actionMode === 'EMERGENCY_PULL_IN') {
       const targetStatus = document.getElementById('modal-roster-target-status')?.value || 'W';
+      const pullInType = document.getElementById('modal-roster-pull-type')?.value || 'REPLACEMENT';
+      const effectiveDate = document.getElementById('modal-roster-effective-date')?.value || '';
       const replacedUnitId = document.getElementById('modal-roster-replaced-unit')?.value || '';
-      if (!replacedUnitId) {
-        showToast('Please select the On-Hired Unit ID being replaced.', 'error');
+
+      if (!effectiveDate || (this.selectedMonth && !effectiveDate.startsWith(this.selectedMonth))) {
+        showToast(`Effective Date must be within the selected roster month (${this.selectedMonth}).`, 'error');
         return;
       }
+
+      if (pullInType === 'REPLACEMENT' && !replacedUnitId) {
+        showToast('Please select the On-Hired Unit ID being replaced, or switch Pull-In Purpose to Additional Fleet Expansion.', 'error');
+        return;
+      }
+
       target.status = targetStatus;
-      target.replacedUnitId = replacedUnitId;
+      target.pullInType = pullInType;
+      target.effectiveDate = effectiveDate;
+      target.replacedUnitId = pullInType === 'REPLACEMENT' ? replacedUnitId : '';
       target.reason = reason;
     }
 
@@ -3371,6 +3429,7 @@ const PopulationModule = {
         const badgeCls = {
           SUPERADMIN_FORCE_OVERRIDE: 'bg-rose-100 text-rose-800',
           EMERGENCY_PULL_IN: 'bg-indigo-100 text-indigo-800',
+          ADDITIONAL_FLEET: 'bg-teal-100 text-teal-800',
           PENDING_OFF_HIRE: 'bg-amber-100 text-amber-900',
           CANCEL_PENDING_OH: 'bg-slate-200 text-slate-700',
           COPY_ROSTER: 'bg-emerald-100 text-emerald-800'
@@ -3396,7 +3455,7 @@ const PopulationModule = {
     }
 
     const btn = document.getElementById('btn-pop-export-csv');
-    const headers = ['Site', 'Roster_Month', 'Unit_ID', 'Category', 'Equipment', 'Brand', 'Model', 'Roster_Status', 'On_Hired_Flag', 'Pending_Off_Hire', 'Replaced_Unit_ID', 'Technical_Reason'];
+    const headers = ['Site', 'Roster_Month', 'Unit_ID', 'Category', 'Equipment', 'Brand', 'Model', 'Roster_Status', 'On_Hired_Flag', 'Effective_Date', 'Pending_Off_Hire', 'Replaced_Unit_ID', 'Technical_Reason'];
     const rows = allUnits.map((u) => [
       AuthModule.currentSite,
       this.selectedMonth,
@@ -3407,6 +3466,7 @@ const PopulationModule = {
       u.model,
       u.status,
       ['W', 'SW'].includes(u.status) ? 'ON_HIRED' : 'OFF_HIRED',
+      u.effectiveDate || '',
       u.pendingOffHire ? 'YES' : 'NO',
       u.replacedUnitId || '',
       u.reason || ''
@@ -3428,7 +3488,8 @@ const PopulationModule = {
         u.status !== u._origStatus ||
         Boolean(u.pendingOffHire) !== u._origPending ||
         (u.replacedUnitId || '') !== u._origReplaced ||
-        (u.reason || '') !== u._origReason
+        (u.reason || '') !== u._origReason ||
+        (u.effectiveDate || '') !== (u._origEffectiveDate || '')
     );
 
     if (changedUnits.length === 0 && !forceSave && this.isMaterialized) {
@@ -3454,7 +3515,9 @@ const PopulationModule = {
       status: u.status,
       pendingOffHire: Boolean(u.pendingOffHire),
       replacedUnitId: u.replacedUnitId || '',
-      reason: u.reason || ''
+      reason: u.reason || '',
+      pullInType: u.pullInType || '',
+      effectiveDate: u.effectiveDate || ''
     }));
 
     const res = await callBackendApi('MANAGE_UNIT_POPULATION', {
