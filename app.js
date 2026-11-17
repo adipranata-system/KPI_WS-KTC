@@ -2944,46 +2944,52 @@ const PopulationModule = {
     });
 
     if (res.status === 'success') {
-      this.rosterUnits = (res.allSiteUnits || []).map((u) => ({
-        ...u,
-        _origStatus: u.status,
-        _origPending: Boolean(u.pendingOffHire),
-        _origReplaced: u.replacedUnitId || '',
-        _origReason: u.reason || '',
-        _origEffectiveDate: u.effectiveDate || '',
-        pullInType: u.pullInType || ''
-      }));
-      this.auditLogs = res.auditLogs || [];
-      this.lockState = res.lockState || {
-        mode: 'GRACE_PERIOD',
-        isLocked: false,
-        label: 'Roster Unlocked',
-        description: ''
-      };
-      this.isMaterialized = Boolean(res.isMaterialized);
-      this.inheritedFrom = res.inheritedFrom || '';
-
-      // Synchronize current month masterData if selected period matches active month
-      const now = new Date();
-      const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-      if (targetMonth === curYM) {
-        AuthModule.masterData.units = res.units || [];
-        AuthModule.masterData.allSiteUnits = res.allSiteUnits || [];
-        AuthModule.populateModelFilters();
-        AuthModule.populateUnitDatalist();
-      }
-
-      this.renderLockBanner();
-      this.renderTable();
-      this.renderAuditLogs();
-
-      if (statusBox) {
-        statusBox.textContent = `Loaded ${this.rosterUnits.length} fleet units for ${res.site} (${targetMonth}).`;
-        statusBox.className = 'text-xs text-emerald-600 font-semibold';
-      }
+      this.applyRosterPayload(res, targetMonth);
     } else if (statusBox) {
       statusBox.textContent = res.message || 'Failed to load monthly fleet roster.';
       statusBox.className = 'text-xs text-rose-600 font-semibold';
+    }
+  },
+
+  applyRosterPayload(res, targetMonth) {
+    this.forceOverride = false;
+    this.rosterUnits = (res.allSiteUnits || []).map((u) => ({
+      ...u,
+      _origStatus: u.status,
+      _origPending: Boolean(u.pendingOffHire),
+      _origReplaced: u.replacedUnitId || '',
+      _origReason: u.reason || '',
+      _origEffectiveDate: u.effectiveDate || '',
+      pullInType: u.pullInType || ''
+    }));
+    this.auditLogs = res.auditLogs || [];
+    this.lockState = res.lockState || {
+      mode: 'GRACE_PERIOD',
+      isLocked: false,
+      label: 'Roster Unlocked',
+      description: ''
+    };
+    this.isMaterialized = Boolean(res.isMaterialized);
+    this.inheritedFrom = res.inheritedFrom || '';
+
+    // Synchronize current month masterData if selected period matches active month
+    const now = new Date();
+    const curYM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    if (targetMonth === curYM) {
+      AuthModule.masterData.units = res.units || [];
+      AuthModule.masterData.allSiteUnits = res.allSiteUnits || [];
+      AuthModule.populateModelFilters();
+      AuthModule.populateUnitDatalist();
+    }
+
+    this.renderLockBanner();
+    this.renderTable();
+    this.renderAuditLogs();
+
+    const statusBox = document.getElementById('pop-status-msg');
+    if (statusBox) {
+      statusBox.textContent = `Loaded ${this.rosterUnits.length} fleet units for ${res.site} (${targetMonth}).`;
+      statusBox.className = 'text-xs text-emerald-600 font-semibold';
     }
   },
 
@@ -3099,7 +3105,11 @@ const PopulationModule = {
 
     if (res.status === 'success') {
       showToast(res.message, 'success');
-      await this.loadMonth();
+      if (res.rosterData && res.rosterData.status === 'success') {
+        this.applyRosterPayload(res.rosterData, this.selectedMonth);
+      } else {
+        await this.loadMonth();
+      }
     } else {
       showToast(res.message || 'Failed to copy previous roster.', 'error');
     }
@@ -3548,7 +3558,11 @@ const PopulationModule = {
 
     if (res.status === 'success') {
       showToast(res.message, 'success');
-      await this.loadMonth();
+      if (res.rosterData && res.rosterData.status === 'success') {
+        this.applyRosterPayload(res.rosterData, this.selectedMonth);
+      } else {
+        await this.loadMonth();
+      }
     } else {
       showToast(res.message || 'Failed to save monthly fleet roster.', 'error');
     }
