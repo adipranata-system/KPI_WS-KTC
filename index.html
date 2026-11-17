@@ -50,7 +50,7 @@
           <h1 class="text-xl font-extrabold text-slate-900 tracking-tight uppercase">Machine Performance System</h1>
           <span class="px-2 py-0.5 text-[10px] font-extrabold bg-blue-100 text-blue-800 border border-blue-200 rounded-full">v2.0</span>
         </div>
-        <p class="text-xs font-semibold text-blue-700 mt-1">PT. KTC COAL MINING &amp; ENERGY</p>
+        <p class="text-[11px] font-semibold text-blue-700 mt-1">Part of AP Systems (Adi Pranata Systems) Ecosystem</p>
         <p class="text-[11px] text-slate-400 mt-0.5">Heavy Equipment Availability &amp; Reliability Portal</p>
       </div>
 
@@ -511,7 +511,7 @@
               <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">View Mode</label>
               <select id="hist-view-mode" onchange="HistoryModule.render()"
                 class="px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-blue-500">
-                <option value="DAILY">Daily Fleet Summary</option>
+                <option value="DAILY">Daily Site Summary</option>
                 <option value="UNIT">Daily Unit Breakdown</option>
               </select>
             </div>
@@ -989,7 +989,7 @@
         <div class="sticky bottom-3 z-20 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex flex-wrap items-center justify-between gap-4">
           <div class="space-y-0.5">
             <div id="op-live-summary" class="text-xs font-bold text-slate-100">
-              Active Fleet: 0 Units | Day WH: 0.0h | Night WH: 0.0h | Total WH: 0.0h | Est. Fleet Rain: 0.0h
+              On-Hired Population: 0 Units | Day WH: 0.0h | Night WH: 0.0h | Total WH: 0.0h | Est. Fleet Rain: 0.0h
             </div>
             <div id="op-status-msg" class="text-[11px] text-slate-400">
               Rows with blank End HM are automatically skipped (counted as Standby / BD). Press Ctrl+S anytime to save.
@@ -1792,7 +1792,7 @@
             <!-- Footer Kredit Sistem Digital Workshop -->
             <div class="pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-500">
               <div>
-                Generated automatically by <strong class="text-slate-700">Machine Performance System (MPS) v2.0</strong> &mdash; Digital Fleet Reliability &amp; KPI Intelligence developed at <strong class="text-slate-700">PT. KTC Coal Mining &amp; Energy Workshop</strong> by <strong class="text-slate-700">Adi Pranata</strong>.
+                Generated automatically by <strong class="text-slate-700">AP Systems &mdash; MPS v2.0 (Machine Performance System)</strong> &bull; Digital Fleet Reliability &amp; KPI Intelligence by <strong class="text-slate-700">Adi Pranata</strong>.
               </div>
               <div class="font-semibold text-slate-600">
                 CONFIDENTIAL &bull; INTERNAL MANAGEMENT REPORT
@@ -1806,8 +1806,9 @@
     <!-- Application Footer (Uniform Wide Layout: max-w-[1600px]) -->
     <footer id="app-footer" class="bg-white border-t border-slate-200 mt-auto">
       <div class="max-w-[1600px] mx-auto px-4 py-3.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-slate-500">
-        <div>
-          <strong class="text-slate-700">Machine Performance System v2.0</strong> &bull; PT. KTC Coal Mining &amp; Energy
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="px-2 py-0.5 text-[10px] font-extrabold bg-slate-900 text-white rounded">AP Systems</span>
+          <strong class="text-slate-700">MPS v2.0 (Machine Performance System)</strong>
         </div>
         <div class="text-center sm:text-right">
           System Architect &amp; Designed by:
@@ -1822,7 +1823,7 @@
   </div>
 
   <!-- External Application Logic Bundle (Split into Core + Report/PDF Module) -->
-  <script src="app.js?v=15"></script>
-  <script src="report-pdf.js?v=16"></script>
+  <script src="app.js?v=17"></script>
+  <script src="report-pdf.js?v=17"></script>
 </body>
 </html>
