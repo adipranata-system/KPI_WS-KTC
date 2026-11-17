@@ -13,6 +13,7 @@
  * ============================================================================ */
 const ReportModule = {
   reportType: 'MONTHLY', // 'WEEKLY' | 'MONTHLY'
+  includeSignatureBlock: false, // Default: false (Electronic Verification Stamp)
   kpiData: null,
   loadedMeta: null,
   analysisData: {
@@ -30,11 +31,34 @@ const ReportModule = {
     const startInput = document.getElementById('rep-start-date');
     const endInput = document.getElementById('rep-end-date');
     const monthPicker = document.getElementById('rep-month-picker');
+    const chkSign = document.getElementById('rep-chk-include-sign');
     if (startInput && endInput && (!startInput.value || !endInput.value)) {
       this.applyDatePreset('MTD', false);
     }
     if (monthPicker && !monthPicker.value && startInput?.value) {
       monthPicker.value = startInput.value.slice(0, 7);
+    }
+    this.toggleSignatureBlock(Boolean(chkSign?.checked));
+  },
+
+  toggleSignatureBlock(checked) {
+    this.includeSignatureBlock = Boolean(checked);
+    const stampBox = document.getElementById('rep-electronic-stamp-box');
+    const signBlock = document.getElementById('rep-signature-block');
+    const hintEl = document.getElementById('rep-sign-mode-hint');
+
+    if (this.includeSignatureBlock) {
+      stampBox?.classList.add('hidden');
+      signBlock?.classList.remove('hidden');
+      if (hintEl) {
+        hintEl.textContent = 'Manual Print Mode: 3-Column Signature Block Enabled';
+      }
+    } else {
+      stampBox?.classList.remove('hidden');
+      signBlock?.classList.add('hidden');
+      if (hintEl) {
+        hintEl.textContent = 'Default: Electronic Verification Stamp (No Wet Signature Required)';
+      }
     }
   },
 
@@ -466,6 +490,9 @@ const ReportModule = {
     const ov = this.kpiData.overall;
 
     // Document Header (Indonesian Formal Paper)
+    const authorName = session?.fullName || session?.username || 'Planner';
+    const printedAtStr = new Date().toLocaleString('id-ID');
+
     document.getElementById('rep-doc-main-title').textContent = isWeekly
       ? 'LAPORAN MINGGUAN OPERASIONAL & KESIAPAN ARMADA'
       : 'LAPORAN BULANAN EKSEKUTIF PERFORMA & RELIABILITAS ARMADA';
@@ -477,8 +504,21 @@ const ReportModule = {
       : 'BULANAN MANAJEMEN (DETAIL)';
     document.getElementById('rep-doc-site').textContent = `${this.kpiData.site} (${model === 'ALL' ? 'Semua Model' : model})`;
     document.getElementById('rep-doc-period').textContent = `${startDate} s/d ${endDate}`;
-    document.getElementById('rep-doc-printed-by').textContent = session?.fullName || session?.username || 'Planner';
-    document.getElementById('rep-doc-printed-at').textContent = new Date().toLocaleString('id-ID');
+    document.getElementById('rep-doc-printed-by').textContent = authorName;
+    document.getElementById('rep-doc-printed-at').textContent = printedAtStr;
+
+    if (this.loadedMeta) {
+      this.loadedMeta.printedBy = authorName;
+      this.loadedMeta.printedAt = printedAtStr;
+    }
+
+    const stampAuthorEl = document.getElementById('rep-stamp-author');
+    const stampDateEl = document.getElementById('rep-stamp-date');
+    if (stampAuthorEl) stampAuthorEl.textContent = authorName;
+    if (stampDateEl) stampDateEl.textContent = printedAtStr;
+
+    const chkSign = document.getElementById('rep-chk-include-sign');
+    this.toggleSignatureBlock(chkSign ? chkSign.checked : this.includeSignatureBlock);
 
     // Toggle Monthly-only Beginner Guides & Chapter Narrative Boxes
     const toggleMonthlyBox = (id, show) => {
@@ -1597,32 +1637,64 @@ const ReportModule = {
         curY += noteWrapped.length * 3.8 + 2;
       }
 
-      // 3 Signature Columns (With Page-Break Guard)
-      ensureSpace(34);
-      curY = Math.max(curY + 5, pageH - 43);
-      const colW = contentW / 3;
-      const signCols = [
-        { top: 'Dibuat Oleh (Prepared by),', role: 'Planner / Admin Plant', dept: 'Plant Department' },
-        { top: 'Diperiksa Oleh (Checked by),', role: 'Chief Mechanic', dept: 'Workshop & Field Maintenance' },
-        { top: 'Diperiksa Oleh (Checked by),', role: 'Maintenance Planner Spv', dept: 'Plant Reliability & Planning' }
-      ];
+      // Endorsement Block: Electronic Verification Stamp (Default) OR 3 Manual Signature Columns
+      const includeSign = Boolean(document.getElementById('rep-chk-include-sign')?.checked);
 
-      signCols.forEach((sc, idx) => {
-        const centerX = margin + colW * idx + colW / 2;
+      if (includeSign) {
+        // 3 Manual Signature Columns (Without Department Subtitle)
+        ensureSpace(30);
+        curY = Math.max(curY + 5, pageH - 40);
+        const colW = contentW / 3;
+        const signCols = [
+          { top: 'Dibuat Oleh (Prepared by),', role: 'Planner / Admin Plant' },
+          { top: 'Diperiksa Oleh (Checked by),', role: 'Chief Mechanic' },
+          { top: 'Diperiksa Oleh (Checked by),', role: 'Maintenance Planner Spv' }
+        ];
+
+        signCols.forEach((sc, idx) => {
+          const centerX = margin + colW * idx + colW / 2;
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(8);
+          doc.setTextColor(30, 41, 59);
+          doc.text(sc.top, centerX, curY, { align: 'center' });
+
+          doc.setDrawColor(30, 41, 59);
+          doc.line(centerX - 28, curY + 17, centerX + 28, curY + 17);
+          doc.text(sc.role, centerX, curY + 21, { align: 'center' });
+        });
+      } else {
+        // Default: Electronic Verification Stamp (No Wet Signature Required)
+        const stampAuthor = sanitizePdfText(this.loadedMeta.printedBy || session?.fullName || session?.username || 'Planner');
+        const stampDate = sanitizePdfText(this.loadedMeta.printedAt || new Date().toLocaleString('id-ID'));
+        const stampBody = `Dokumen ini diterbitkan dan diverifikasi secara elektronik melalui Machine Performance System (MPS) v2.0 oleh ${stampAuthor} pada ${stampDate}. Sah secara administratif tanpa memerlukan tanda tangan basah.`;
+        const stampLines = doc.splitTextToSize(stampBody, contentW - 34);
+        const stampBoxH = Math.max(15, stampLines.length * 3.8 + 8);
+
+        ensureSpace(stampBoxH + 4);
+        curY += 3;
+
+        doc.setFillColor(236, 253, 245);
+        doc.setDrawColor(110, 231, 183);
+        doc.roundedRect(margin, curY, contentW, stampBoxH, 1.5, 1.5, 'FD');
+
+        doc.setFillColor(4, 120, 87);
+        doc.roundedRect(margin + 3, curY + 3, 26, 5.5, 1, 1, 'F');
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(30, 41, 59);
-        doc.text(sc.top, centerX, curY, { align: 'center' });
+        doc.setFontSize(6.5);
+        doc.setTextColor(255, 255, 255);
+        doc.text('VERIFIED DIGITAL', margin + 16, curY + 6.7, { align: 'center' });
 
-        doc.setDrawColor(30, 41, 59);
-        doc.line(centerX - 28, curY + 17, centerX + 28, curY + 17);
-        doc.text(sc.role, centerX, curY + 21, { align: 'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.8);
+        doc.setTextColor(6, 78, 59);
+        doc.text('PENGESAHAN DOKUMEN ELEKTRONIK', margin + 32, curY + 6.5);
 
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7);
-        doc.setTextColor(100, 116, 139);
-        doc.text(sc.dept, centerX, curY + 24.5, { align: 'center' });
-      });
+        doc.setFontSize(7.4);
+        doc.setTextColor(51, 65, 85);
+        doc.text(stampLines, margin + 32, curY + 10.8);
+        curY += stampBoxH + 3;
+      }
 
       // Official Workshop System Footer & Page Numbering across ALL pages
       const totalPages = doc.internal.getNumberOfPages();
