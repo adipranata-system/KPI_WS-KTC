@@ -268,6 +268,7 @@ async function refreshCurrentView() {
  * 1. AUTHENTICATION & ROLE ACCESS CONTROL MODULE
  * ============================================================================ */
 const AuthModule = {
+  _initialized: false,
   currentSite: 'TTLP',
   masterData: {
     units: [],
@@ -277,6 +278,9 @@ const AuthModule = {
   },
 
   init() {
+    if (this._initialized) return;
+    this._initialized = true;
+
     const rememberedUser = localStorage.getItem('mps_remembered_user');
     const userInput = document.getElementById('login-username');
     const rememberChk = document.getElementById('login-remember-user');
@@ -1263,7 +1267,7 @@ const HistoryModule = {
         <tr class="border-b border-slate-200 text-[11px] uppercase text-slate-500 select-none">
           <th onclick="HistoryModule.sortBy('date')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Date ${this.getSortIndicator('date')}</th>
           <th onclick="HistoryModule.sortBy('dayName')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Day ${this.getSortIndicator('dayName')}</th>
-          <th onclick="HistoryModule.sortBy('unitCount')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Fleet ${this.getSortIndicator('unitCount')}</th>
+          <th onclick="HistoryModule.sortBy('unitCount')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">On-Hired Units ${this.getSortIndicator('unitCount')}</th>
           <th onclick="HistoryModule.sortBy('calHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Cal Hrs ${this.getSortIndicator('calHrs')}</th>
           <th onclick="HistoryModule.sortBy('wh')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">WH ${this.getSortIndicator('wh')}</th>
           <th onclick="HistoryModule.sortBy('bdUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Unsch ${this.getSortIndicator('bdUnsched')}</th>
@@ -1420,7 +1424,7 @@ const HistoryModule = {
     const rowsToExport = this.getFilteredRows();
 
     if (mode === 'DAILY') {
-      const headers = ['Site', 'Date', 'Day', 'Fleet_Size', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
+      const headers = ['Site', 'Date', 'Day', 'On_Hired_Units', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
       const rows = rowsToExport.map((r) => [
         AuthModule.currentSite,
         r.date,
@@ -2748,7 +2752,7 @@ const InputHmModule = {
     const summaryEl = document.getElementById('op-live-summary');
     const statusEl = document.getElementById('op-status-msg');
     if (summaryEl) {
-      summaryEl.textContent = `Active Fleet: ${activeCount} Units | Day WH: ${dayWh.toFixed(1)}h | Night WH: ${nightWh.toFixed(1)}h | Total WH: ${totWh.toFixed(1)}h | Est. Fleet Rain: ${rainPop.toFixed(1)}h`;
+      summaryEl.textContent = `On-Hired Population: ${activeCount} Units | Day WH: ${dayWh.toFixed(1)}h | Night WH: ${nightWh.toFixed(1)}h | Total WH: ${totWh.toFixed(1)}h | Est. Fleet Rain: ${rainPop.toFixed(1)}h`;
     }
     if (statusEl && this.selectedDate) {
       const hasRows = this.operations.DAY.length > 0 || this.operations.NIGHT.length > 0;
