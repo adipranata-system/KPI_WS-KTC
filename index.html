@@ -1338,6 +1338,18 @@
             </div>
           </div>
 
+          <!-- Signature Block Display Toggle (Default: Unchecked / Electronic Verification Stamp) -->
+          <div class="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+            <label class="inline-flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 select-none">
+              <input type="checkbox" id="rep-chk-include-sign" onchange="ReportModule.toggleSignatureBlock(this.checked)"
+                class="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
+              <span>Include Manual Signature Block (For Physical Print)</span>
+            </label>
+            <span id="rep-sign-mode-hint" class="text-[11px] text-slate-500">
+              Default: Electronic Verification Stamp (No Wet Signature Required)
+            </span>
+          </div>
+
           <!-- Optional Field Notes & Custom Chapter Narrative Editor -->
           <div class="space-y-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1740,13 +1752,25 @@
               </div>
             </div>
 
-            <!-- 3 Kolom Pengesahan (Tanda Tangan) -->
-            <div class="grid grid-cols-3 gap-8 pt-4 text-center text-xs">
+            <!-- Stempel Pengesahan Elektronik (Default aktif saat kolom tanda tangan tidak dicentang) -->
+            <div id="rep-electronic-stamp-box" class="p-3.5 rounded-lg bg-emerald-50/70 border border-emerald-300 flex items-start gap-3">
+              <div class="px-2.5 py-1 rounded bg-emerald-700 text-white text-[10px] font-extrabold uppercase tracking-wider shrink-0 mt-0.5">
+                VERIFIED DIGITAL
+              </div>
+              <div class="text-xs text-slate-800 space-y-0.5">
+                <div class="font-extrabold text-emerald-950 uppercase text-[11px]">Pengesahan Dokumen Elektronik</div>
+                <p id="rep-electronic-stamp-text" class="text-[11px] leading-relaxed text-slate-700">
+                  Dokumen ini diterbitkan dan diverifikasi secara elektronik melalui <strong>Machine Performance System (MPS) v2.0</strong> oleh <strong id="rep-stamp-author">-</strong> pada <strong id="rep-stamp-date">-</strong>. Sah secara administratif tanpa memerlukan tanda tangan basah.
+                </p>
+              </div>
+            </div>
+
+            <!-- 3 Kolom Pengesahan (Tanda Tangan Manual - Tampil hanya jika opsi dicentang) -->
+            <div id="rep-signature-block" class="hidden grid grid-cols-3 gap-8 pt-4 text-center text-xs">
               <div class="space-y-14">
                 <div class="font-bold text-slate-800">Dibuat Oleh <span class="italic font-normal text-slate-500">(Prepared by)</span>,</div>
                 <div class="border-t border-slate-800 pt-1.5 mx-6">
                   <div class="font-bold text-slate-900">Planner / Admin Plant</div>
-                  <div class="text-[10px] text-slate-500">Plant Department</div>
                 </div>
               </div>
 
@@ -1754,7 +1778,6 @@
                 <div class="font-bold text-slate-800">Diperiksa Oleh <span class="italic font-normal text-slate-500">(Checked by)</span>,</div>
                 <div class="border-t border-slate-800 pt-1.5 mx-6">
                   <div class="font-bold text-slate-900">Chief Mechanic</div>
-                  <div class="text-[10px] text-slate-500">Workshop &amp; Field Maintenance</div>
                 </div>
               </div>
 
@@ -1762,7 +1785,6 @@
                 <div class="font-bold text-slate-800">Diperiksa Oleh <span class="italic font-normal text-slate-500">(Checked by)</span>,</div>
                 <div class="border-t border-slate-800 pt-1.5 mx-6">
                   <div class="font-bold text-slate-900">Maintenance Planner Spv</div>
-                  <div class="text-[10px] text-slate-500">Plant Reliability &amp; Planning</div>
                 </div>
               </div>
             </div>
@@ -1801,6 +1823,6 @@
 
   <!-- External Application Logic Bundle (Split into Core + Report/PDF Module) -->
   <script src="app.js?v=15"></script>
-  <script src="report-pdf.js?v=15"></script>
+  <script src="report-pdf.js?v=16"></script>
 </body>
 </html>
