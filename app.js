@@ -1201,7 +1201,7 @@ const HistoryModule = {
             </tr>`;
         })
         .join('');
-      if (totalEl) totalEl.textContent = `Total Logged Pure BD: ${totPure.toFixed(2)} Hrs (${matches.length} Incident${matches.length === 1 ? '' : 's'})`;
+      if (totalEl) totalEl.textContent = `Total Logged Pure BD: ${totPure.toFixed(2)} Hrs (${matches.length} Damaged Unit${matches.length === 1 ? '' : 's'})`;
     }
 
     modal.classList.remove('hidden');
