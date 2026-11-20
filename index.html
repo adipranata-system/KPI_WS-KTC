@@ -437,6 +437,7 @@
                   <th class="px-3 py-2.5">Model</th>
                   <th class="px-3 py-2.5 text-right">WH (Hrs)</th>
                   <th class="px-3 py-2.5 text-right">BD Unsch</th>
+                  <th class="px-3 py-2.5 text-right">Freq</th>
                   <th class="px-3 py-2.5 text-right">BD Sch</th>
                   <th class="px-3 py-2.5 text-right">Standby</th>
                   <th class="px-3 py-2.5 text-right">PA (%)</th>
@@ -456,7 +457,7 @@
           <div class="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h3 class="text-sm font-bold text-slate-800">Detailed KPI by Unit</h3>
-              <p class="text-[11px] text-slate-400">Click column headers (PA, MA, UA, WH, BD Unsch) to sort</p>
+              <p class="text-[11px] text-slate-400">Click column headers (PA, MA, UA, WH, BD Unsch, Freq) to sort</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
               <select id="dash-unit-target-filter" onchange="DashboardModule.renderUnitTable()"
@@ -478,6 +479,7 @@
                   <th onclick="DashboardModule.sortUnitBy('model')" class="px-3 py-2.5 cursor-pointer hover:text-blue-600">Model &#8597;</th>
                   <th onclick="DashboardModule.sortUnitBy('wh')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">WH &#8597;</th>
                   <th onclick="DashboardModule.sortUnitBy('bdUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Unsch &#8597;</th>
+                  <th onclick="DashboardModule.sortUnitBy('freqUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Freq &#8597;</th>
                   <th class="px-3 py-2.5 text-right">BD Sch</th>
                   <th class="px-3 py-2.5 text-right">Standby</th>
                   <th onclick="DashboardModule.sortUnitBy('pa')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">PA (%) &#8597;</th>
@@ -1636,6 +1638,7 @@
                     <th class="px-2.5 py-1.5">Model Unit</th>
                     <th class="px-2.5 py-1.5 text-right">WH (Jam)</th>
                     <th class="px-2.5 py-1.5 text-right">BD Unsch</th>
+                    <th class="px-2.5 py-1.5 text-right">Freq</th>
                     <th class="px-2.5 py-1.5 text-right">BD Sch</th>
                     <th class="px-2.5 py-1.5 text-right">Standby</th>
                     <th class="px-2.5 py-1.5 text-right">PA (%)</th>
@@ -1666,6 +1669,7 @@
                       <th class="px-2 py-1.5 text-right">Cal Hrs</th>
                       <th class="px-2 py-1.5 text-right">WH</th>
                       <th class="px-2 py-1.5 text-right">BD Unsch</th>
+                      <th class="px-2 py-1.5 text-right">Freq</th>
                       <th class="px-2 py-1.5 text-right">BD Sch</th>
                       <th class="px-2 py-1.5 text-right">Rain</th>
                       <th class="px-2 py-1.5 text-right">Standby</th>
@@ -1697,6 +1701,7 @@
                     <th class="px-2.5 py-1.5">Model</th>
                     <th class="px-2.5 py-1.5 text-right">WH (Jam)</th>
                     <th class="px-2.5 py-1.5 text-right">BD Unsch</th>
+                    <th class="px-2.5 py-1.5 text-right">Freq</th>
                     <th class="px-2.5 py-1.5 text-right">BD Sch</th>
                     <th class="px-2.5 py-1.5 text-right">Standby</th>
                     <th class="px-2.5 py-1.5 text-right">PA (%)</th>
@@ -1823,7 +1828,7 @@
   </div>
 
   <!-- External Application Logic Bundle (Split into Core + Report/PDF Module) -->
-  <script src="app.js?v=18"></script>
-  <script src="report-pdf.js?v=18"></script>
+  <script src="app.js?v=19"></script>
+  <script src="report-pdf.js?v=19"></script>
 </body>
 </html>
