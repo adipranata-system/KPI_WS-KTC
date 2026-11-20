@@ -1784,7 +1784,8 @@ const UploadExcelModule = {
           timeIn: seg.timeIn,
           timeOut: seg.timeOut,
           pureHours: seg.pureHours,
-          codeComponent: codeComponent
+          codeComponent: codeComponent,
+          isCarryOver: Boolean(seg.isCarryOver)
         });
       });
     }
@@ -1847,7 +1848,8 @@ const UploadExcelModule = {
         finishDate: isReady ? endYMD : '',
         timeIn: timeIn,
         timeOut: isReady ? timeOut : '',
-        pureHours: 0
+        pureHours: 0,
+        isCarryOver: false
       }];
     }
 
@@ -1884,7 +1886,8 @@ const UploadExcelModule = {
         finishDate: isLast && !isReady ? '' : ymd,
         timeIn: isFirst ? timeIn : '06:00',
         timeOut: isLast ? (isReady ? timeOut : '') : '05:00',
-        pureHours: totalPure
+        pureHours: totalPure,
+        isCarryOver: !isFirst
       });
 
       cur.setDate(cur.getDate() + 1);
@@ -1993,13 +1996,16 @@ const UploadExcelModule = {
         const badge = isOpen
           ? '<span class="px-2 py-0.5 text-xs font-semibold bg-rose-100 text-rose-700 rounded">Breakdown (Open)</span>'
           : '<span class="px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded">Ready</span>';
+        const carryOverTag = item.isCarryOver
+          ? '<span class="ml-1 px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 rounded">Carry-Over</span>'
+          : '';
 
         return `
           <tr class="border-b border-slate-100 text-xs hover:bg-slate-50">
             <td class="px-3 py-2 font-medium">${item.startDate}</td>
             <td class="px-3 py-2 font-bold text-slate-800">${item.unitId}</td>
             <td class="px-3 py-2"><span class="px-1.5 py-0.5 bg-slate-200 rounded font-semibold">${item.code}</span></td>
-            <td class="px-3 py-2">${badge}</td>
+            <td class="px-3 py-2">${badge}${carryOverTag}</td>
             <td class="px-3 py-2">${item.timeIn}</td>
             <td class="px-3 py-2">${isOpen ? '<em>Auto Shift End</em>' : `${item.finishDate} ${item.timeOut}`}</td>
             <td class="px-3 py-2 text-right font-bold text-rose-600">${Number(item.pureHours).toFixed(2)}h</td>
