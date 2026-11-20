@@ -685,12 +685,13 @@ const ReportModule = {
     const byModel = this.kpiData.byModel || [];
     const tfootModel = document.getElementById('rep-tfoot-model');
     document.getElementById('rep-tbody-model').innerHTML = byModel.length === 0
-      ? `<tr><td colspan="10" class="px-3 py-3 text-center text-slate-400">Belum ada data pada periode evaluasi.</td></tr>`
+      ? `<tr><td colspan="11" class="px-3 py-3 text-center text-slate-400">Belum ada data pada periode evaluasi.</td></tr>`
       : byModel.map((m) => `
           <tr class="border-b border-slate-200">
             <td class="px-2.5 py-1.5 font-bold text-slate-900">${m.model}</td>
             <td class="px-2.5 py-1.5 text-right">${m.wh.toFixed(1)}</td>
             <td class="px-2.5 py-1.5 text-right text-rose-700">${m.bdUnsched.toFixed(1)}</td>
+            <td class="px-2.5 py-1.5 text-right font-semibold text-slate-800">${Number(m.freqUnsched) || 0}</td>
             <td class="px-2.5 py-1.5 text-right text-amber-700">${m.bdSched.toFixed(1)}</td>
             <td class="px-2.5 py-1.5 text-right">${m.stbyHrs.toFixed(1)}</td>
             <td class="px-2.5 py-1.5 text-right font-bold ${m.pa >= target ? 'text-emerald-700' : 'text-rose-700'}">${m.pa.toFixed(2)}%</td>
@@ -706,6 +707,7 @@ const ReportModule = {
           <td class="px-2.5 py-1.5 uppercase">TOTAL / RATA-RATA ARMADA</td>
           <td class="px-2.5 py-1.5 text-right">${ov.wh.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.bdUnsched.toFixed(1)}</td>
+          <td class="px-2.5 py-1.5 text-right">${Number(ov.freqUnsched) || 0}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.bdSched.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.stbyHrs.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.pa.toFixed(2)}%</td>
@@ -725,14 +727,15 @@ const ReportModule = {
       if (dailyBadge) dailyBadge.textContent = `${dailyRows.length} Hari Tercatat`;
 
       if (dailyRows.length === 0) {
-        tbodyDailyLog.innerHTML = `<tr><td colspan="14" class="px-3 py-3 text-center text-slate-400">Belum ada log harian pada periode ini.</td></tr>`;
+        tbodyDailyLog.innerHTML = `<tr><td colspan="15" class="px-3 py-3 text-center text-slate-400">Belum ada log harian pada periode ini.</td></tr>`;
         if (tfootDailyLog) tfootDailyLog.innerHTML = '';
       } else {
-        let sumCal = 0, sumWh = 0, sumUnsch = 0, sumSch = 0, sumRain = 0, sumStby = 0;
+        let sumCal = 0, sumWh = 0, sumUnsch = 0, sumFreq = 0, sumSch = 0, sumRain = 0, sumStby = 0;
         tbodyDailyLog.innerHTML = dailyRows.map((d) => {
           sumCal += Number(d.calHrs) || 0;
           sumWh += Number(d.wh) || 0;
           sumUnsch += Number(d.bdUnsched) || 0;
+          sumFreq += Number(d.freqUnsched) || 0;
           sumSch += Number(d.bdSched) || 0;
           sumRain += Number(d.rainHrs) || 0;
           sumStby += Number(d.stbyHrs) || 0;
@@ -745,6 +748,7 @@ const ReportModule = {
               <td class="px-2 py-1.5 text-right">${d.calHrs !== undefined ? Number(d.calHrs).toFixed(1) : '-'}</td>
               <td class="px-2 py-1.5 text-right font-semibold">${d.wh !== undefined ? Number(d.wh).toFixed(1) : '-'}</td>
               <td class="px-2 py-1.5 text-right text-rose-700">${d.bdUnsched !== undefined ? Number(d.bdUnsched).toFixed(1) : '-'}</td>
+              <td class="px-2 py-1.5 text-right font-semibold text-slate-800">${d.freqUnsched !== undefined ? Number(d.freqUnsched) : 0}</td>
               <td class="px-2 py-1.5 text-right text-amber-700">${d.bdSched !== undefined ? Number(d.bdSched).toFixed(1) : '-'}</td>
               <td class="px-2 py-1.5 text-right text-sky-700">${d.rainHrs !== undefined ? Number(d.rainHrs).toFixed(1) : '-'}</td>
               <td class="px-2 py-1.5 text-right">${d.stbyHrs !== undefined ? Number(d.stbyHrs).toFixed(1) : '-'}</td>
@@ -763,6 +767,7 @@ const ReportModule = {
               <td class="px-2 py-1.5 text-right">${sumCal.toFixed(1)}</td>
               <td class="px-2 py-1.5 text-right">${sumWh.toFixed(1)}</td>
               <td class="px-2 py-1.5 text-right">${sumUnsch.toFixed(1)}</td>
+              <td class="px-2 py-1.5 text-right">${sumFreq}</td>
               <td class="px-2 py-1.5 text-right">${sumSch.toFixed(1)}</td>
               <td class="px-2 py-1.5 text-right">${sumRain.toFixed(1)}</td>
               <td class="px-2 py-1.5 text-right">${sumStby.toFixed(1)}</td>
@@ -790,7 +795,7 @@ const ReportModule = {
       : `Total ${displayUnits.length} Unit Dievaluasi`;
 
     document.getElementById('rep-tbody-unit').innerHTML = displayUnits.length === 0
-      ? `<tr><td colspan="12" class="px-3 py-3 text-center text-emerald-700 font-semibold">${isWeekly ? 'Seluruh unit mencapai target PA ≥ 85% pada minggu ini.' : 'Belum ada data unit.'}</td></tr>`
+      ? `<tr><td colspan="13" class="px-3 py-3 text-center text-emerald-700 font-semibold">${isWeekly ? 'Seluruh unit mencapai target PA ≥ 85% pada minggu ini.' : 'Belum ada data unit.'}</td></tr>`
       : displayUnits.map((u) => {
           const isPass = u.pa >= target;
           return `
@@ -799,6 +804,7 @@ const ReportModule = {
               <td class="px-2.5 py-1.5">${u.model}</td>
               <td class="px-2.5 py-1.5 text-right">${u.wh.toFixed(1)}</td>
               <td class="px-2.5 py-1.5 text-right text-rose-700">${u.bdUnsched.toFixed(1)}</td>
+              <td class="px-2.5 py-1.5 text-right font-semibold text-slate-800">${Number(u.freqUnsched) || 0}</td>
               <td class="px-2.5 py-1.5 text-right text-amber-700">${u.bdSched.toFixed(1)}</td>
               <td class="px-2.5 py-1.5 text-right">${u.stbyHrs.toFixed(1)}</td>
               <td class="px-2.5 py-1.5 text-right font-bold ${isPass ? 'text-emerald-700' : 'text-rose-700'}">${u.pa.toFixed(2)}%</td>
@@ -1375,6 +1381,7 @@ const ReportModule = {
         m.model,
         m.wh.toFixed(1),
         m.bdUnsched.toFixed(1),
+        String(Number(m.freqUnsched) || 0),
         m.bdSched.toFixed(1),
         m.stbyHrs.toFixed(1),
         `${m.pa.toFixed(2)}%`,
@@ -1387,12 +1394,13 @@ const ReportModule = {
       doc.autoTable({
         startY: curY,
         margin: { left: margin, right: margin },
-        head: [['Model Unit', 'WH (Jam)', 'BD Unsch', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR']],
-        body: modelRows.length > 0 ? modelRows : [['-', '0', '0', '0', '0', '0%', '0%', '0%', '0j', '0j']],
+        head: [['Model Unit', 'WH (Jam)', 'BD Unsch', 'Freq', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR']],
+        body: modelRows.length > 0 ? modelRows : [['-', '0', '0', '0', '0', '0', '0%', '0%', '0%', '0j', '0j']],
         foot: modelRows.length > 0 ? [[
           'TOTAL / RATA-RATA',
           ov.wh.toFixed(1),
           ov.bdUnsched.toFixed(1),
+          String(Number(ov.freqUnsched) || 0),
           ov.bdSched.toFixed(1),
           ov.stbyHrs.toFixed(1),
           `${ov.pa.toFixed(2)}%`,
@@ -1407,11 +1415,11 @@ const ReportModule = {
         footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
         columnStyles: {
           1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
-          5: { halign: 'right', fontStyle: 'bold' }, 6: { halign: 'right', fontStyle: 'bold' },
-          7: { halign: 'right', fontStyle: 'bold' }, 8: { halign: 'right' }, 9: { halign: 'right' }
+          5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' }, 7: { halign: 'right', fontStyle: 'bold' },
+          8: { halign: 'right', fontStyle: 'bold' }, 9: { halign: 'right' }, 10: { halign: 'right' }
         },
         didParseCell: (data) => {
-          if (data.section === 'body' && [5, 6, 7].includes(data.column.index)) {
+          if (data.section === 'body' && [6, 7, 8].includes(data.column.index)) {
             const num = parseFloat(String(data.cell.raw || '0'));
             if (!isNaN(num)) {
               data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
@@ -1445,6 +1453,7 @@ const ReportModule = {
         u.model,
         u.wh.toFixed(1),
         u.bdUnsched.toFixed(1),
+        String(Number(u.freqUnsched) || 0),
         u.bdSched.toFixed(1),
         u.stbyHrs.toFixed(1),
         `${u.pa.toFixed(2)}%`,
@@ -1458,25 +1467,25 @@ const ReportModule = {
       doc.autoTable({
         startY: curY,
         margin: { left: margin, right: margin },
-        head: [['Unit ID', 'Model', 'WH (Jam)', 'BD Unsch', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR', 'Status']],
-        body: unitRows.length > 0 ? unitRows : [['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', isWeekly ? 'SEMUA UNIT TERCAPAI' : 'NIHIL']],
+        head: [['Unit ID', 'Model', 'WH (Jam)', 'BD Unsch', 'Freq', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR', 'Status']],
+        body: unitRows.length > 0 ? unitRows : [['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', isWeekly ? 'SEMUA UNIT TERCAPAI' : 'NIHIL']],
         theme: 'grid',
         styles: { fontSize: 7.1, cellPadding: 1.5 },
         headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
         columnStyles: {
           2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
-          6: { halign: 'right', fontStyle: 'bold' }, 7: { halign: 'right' }, 8: { halign: 'right' },
-          9: { halign: 'right' }, 10: { halign: 'right' }, 11: { halign: 'center', fontStyle: 'bold' }
+          6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' }, 8: { halign: 'right' },
+          9: { halign: 'right' }, 10: { halign: 'right' }, 11: { halign: 'right' }, 12: { halign: 'center', fontStyle: 'bold' }
         },
         didParseCell: (data) => {
           if (data.section === 'body') {
-            if ([6, 7, 8].includes(data.column.index)) {
+            if ([7, 8, 9].includes(data.column.index)) {
               const num = parseFloat(String(data.cell.raw || '0'));
               if (!isNaN(num)) {
                 data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
               }
             }
-            if (data.column.index === 11) {
+            if (data.column.index === 12) {
               const st = String(data.cell.raw || '');
               if (st === 'BELOW') {
                 data.cell.styles.textColor = [190, 18, 60];
@@ -1499,11 +1508,12 @@ const ReportModule = {
         doc.text(`3.4 Log Performa Harian Armada (${this.kpiData.trend.length} Hari Evaluasi)`, margin, curY);
         curY += 2;
 
-        let sumCal = 0, sumWh = 0, sumUnsch = 0, sumSch = 0, sumRain = 0, sumStby = 0;
+        let sumCal = 0, sumWh = 0, sumUnsch = 0, sumFreq = 0, sumSch = 0, sumRain = 0, sumStby = 0;
         const dailyLogRows = this.kpiData.trend.map((d) => {
           sumCal += Number(d.calHrs) || 0;
           sumWh += Number(d.wh) || 0;
           sumUnsch += Number(d.bdUnsched) || 0;
+          sumFreq += Number(d.freqUnsched) || 0;
           sumSch += Number(d.bdSched) || 0;
           sumRain += Number(d.rainHrs) || 0;
           sumStby += Number(d.stbyHrs) || 0;
@@ -1515,6 +1525,7 @@ const ReportModule = {
             d.calHrs !== undefined ? Number(d.calHrs).toFixed(1) : '-',
             d.wh !== undefined ? Number(d.wh).toFixed(1) : '-',
             d.bdUnsched !== undefined ? Number(d.bdUnsched).toFixed(1) : '-',
+            d.freqUnsched !== undefined ? String(Number(d.freqUnsched)) : '0',
             d.bdSched !== undefined ? Number(d.bdSched).toFixed(1) : '-',
             d.rainHrs !== undefined ? Number(d.rainHrs).toFixed(1) : '-',
             d.stbyHrs !== undefined ? Number(d.stbyHrs).toFixed(1) : '-',
@@ -1529,7 +1540,7 @@ const ReportModule = {
         doc.autoTable({
           startY: curY,
           margin: { left: margin, right: margin },
-          head: [['Tanggal', 'Hari', 'Unit', 'Cal Hrs', 'WH', 'BD Unsch', 'BD Sch', 'Rain', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR']],
+          head: [['Tanggal', 'Hari', 'Unit', 'Cal Hrs', 'WH', 'BD Unsch', 'Freq', 'BD Sch', 'Rain', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR']],
           body: dailyLogRows,
           foot: [[
             'TOTAL / AVG',
@@ -1538,6 +1549,7 @@ const ReportModule = {
             sumCal.toFixed(1),
             sumWh.toFixed(1),
             sumUnsch.toFixed(1),
+            String(sumFreq),
             sumSch.toFixed(1),
             sumRain.toFixed(1),
             sumStby.toFixed(1),
@@ -1553,12 +1565,12 @@ const ReportModule = {
           footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
           columnStyles: {
             2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
-            6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' },
-            9: { halign: 'right', fontStyle: 'bold' }, 10: { halign: 'right' }, 11: { halign: 'right' },
-            12: { halign: 'right' }, 13: { halign: 'right' }
+            6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' }, 9: { halign: 'right' },
+            10: { halign: 'right', fontStyle: 'bold' }, 11: { halign: 'right' }, 12: { halign: 'right' },
+            13: { halign: 'right' }, 14: { halign: 'right' }
           },
           didParseCell: (data) => {
-            if (data.section === 'body' && [9, 10, 11].includes(data.column.index)) {
+            if (data.section === 'body' && [10, 11, 12].includes(data.column.index)) {
               const num = parseFloat(String(data.cell.raw || '0'));
               if (!isNaN(num)) {
                 data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
@@ -1783,13 +1795,13 @@ function getDemoApiResponse(action, payload, session) {
         stbyHrs: 48.0
       },
       trend: [
-        { date: '2026-11-08', dayName: 'Sunday', unitCount: 3, calHrs: 60, wh: 49.0, bdUnsched: 4.0, bdSched: 2.0, rainHrs: 1.0, stbyHrs: 4.0, pa: 90.0, ma: 92.45, ua: 90.74, mttr: 2.0, mtbr: 24.5 },
-        { date: '2026-11-09', dayName: 'Monday', unitCount: 3, calHrs: 60, wh: 47.0, bdUnsched: 5.0, bdSched: 2.8, rainHrs: 1.2, stbyHrs: 4.0, pa: 87.0, ma: 90.38, ua: 90.04, mttr: 2.5, mtbr: 23.5 },
-        { date: '2026-11-10', dayName: 'Tuesday', unitCount: 3, calHrs: 60, wh: 50.0, bdUnsched: 3.2, bdSched: 2.0, rainHrs: 0.8, stbyHrs: 4.0, pa: 91.33, ma: 93.98, ua: 91.24, mttr: 1.6, mtbr: 25.0 },
-        { date: '2026-11-11', dayName: 'Wednesday', unitCount: 3, calHrs: 60, wh: 44.0, bdUnsched: 6.3, bdSched: 3.0, rainHrs: 2.0, stbyHrs: 4.7, pa: 84.5, ma: 87.48, ua: 86.79, mttr: 3.15, mtbr: 22.0 },
-        { date: '2026-11-12', dayName: 'Thursday', unitCount: 3, calHrs: 60, wh: 48.0, bdUnsched: 4.2, bdSched: 2.5, rainHrs: 1.0, stbyHrs: 4.3, pa: 88.83, ma: 91.95, ua: 90.06, mttr: 2.1, mtbr: 24.0 },
-        { date: '2026-11-13', dayName: 'Friday', unitCount: 3, calHrs: 57, wh: 46.0, bdUnsched: 3.7, bdSched: 2.0, rainHrs: 1.3, stbyHrs: 4.0, pa: 90.0, ma: 92.56, ua: 89.67, mttr: 1.85, mtbr: 23.0 },
-        { date: '2026-11-14', dayName: 'Saturday', unitCount: 3, calHrs: 60, wh: 46.5, bdUnsched: 4.9, bdSched: 3.0, rainHrs: 1.0, stbyHrs: 4.6, pa: 86.83, ma: 90.47, ua: 89.25, mttr: 2.45, mtbr: 23.25 }
+        { date: '2026-11-08', dayName: 'Sunday', unitCount: 3, calHrs: 60, wh: 49.0, bdUnsched: 4.0, freqUnsched: 2, bdSched: 2.0, rainHrs: 1.0, stbyHrs: 4.0, pa: 90.0, ma: 92.45, ua: 90.74, mttr: 2.0, mtbr: 24.5 },
+        { date: '2026-11-09', dayName: 'Monday', unitCount: 3, calHrs: 60, wh: 47.0, bdUnsched: 5.0, freqUnsched: 2, bdSched: 2.8, rainHrs: 1.2, stbyHrs: 4.0, pa: 87.0, ma: 90.38, ua: 90.04, mttr: 2.5, mtbr: 23.5 },
+        { date: '2026-11-10', dayName: 'Tuesday', unitCount: 3, calHrs: 60, wh: 50.0, bdUnsched: 3.2, freqUnsched: 2, bdSched: 2.0, rainHrs: 0.8, stbyHrs: 4.0, pa: 91.33, ma: 93.98, ua: 91.24, mttr: 1.6, mtbr: 25.0 },
+        { date: '2026-11-11', dayName: 'Wednesday', unitCount: 3, calHrs: 60, wh: 44.0, bdUnsched: 6.3, freqUnsched: 2, bdSched: 3.0, rainHrs: 2.0, stbyHrs: 4.7, pa: 84.5, ma: 87.48, ua: 86.79, mttr: 3.15, mtbr: 22.0 },
+        { date: '2026-11-12', dayName: 'Thursday', unitCount: 3, calHrs: 60, wh: 48.0, bdUnsched: 4.2, freqUnsched: 2, bdSched: 2.5, rainHrs: 1.0, stbyHrs: 4.3, pa: 88.83, ma: 91.95, ua: 90.06, mttr: 2.1, mtbr: 24.0 },
+        { date: '2026-11-13', dayName: 'Friday', unitCount: 3, calHrs: 57, wh: 46.0, bdUnsched: 3.7, freqUnsched: 2, bdSched: 2.0, rainHrs: 1.3, stbyHrs: 4.0, pa: 90.0, ma: 92.56, ua: 89.67, mttr: 1.85, mtbr: 23.0 },
+        { date: '2026-11-14', dayName: 'Saturday', unitCount: 3, calHrs: 60, wh: 46.5, bdUnsched: 4.9, freqUnsched: 2, bdSched: 3.0, rainHrs: 1.0, stbyHrs: 4.6, pa: 86.83, ma: 90.47, ua: 89.25, mttr: 2.45, mtbr: 23.25 }
       ],
       pareto: [
         { component: 'HYD - Hydraulic System', totalHours: 28.5 },
@@ -1808,15 +1820,15 @@ function getDemoApiResponse(action, payload, session) {
         }
       ],
       byModel: [
-        { model: 'ZX870H-3F', wh: 340.0, bdUnsched: 32.0, bdSched: 18.0, stbyHrs: 24.0, pa: 87.5, ma: 91.4, ua: 87.2, mttr: 2.67, mtbr: 28.3 },
-        { model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
-        { model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
+        { model: 'ZX870H-3F', wh: 340.0, bdUnsched: 32.0, freqUnsched: 12, bdSched: 18.0, stbyHrs: 24.0, pa: 87.5, ma: 91.4, ua: 87.2, mttr: 2.67, mtbr: 28.3 },
+        { model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
+        { model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
       ],
       byUnit: [
-        { unitId: 'EX-1320', model: 'ZX870H-3F', wh: 182.0, bdUnsched: 10.0, bdSched: 8.0, stbyHrs: 12.0, pa: 91.0, ma: 94.8, ua: 91.0, mttr: 2.5, mtbr: 45.5 },
-        { unitId: 'EX-1351', model: 'ZX870H-3F', wh: 158.0, bdUnsched: 22.0, bdSched: 10.0, stbyHrs: 12.0, pa: 84.0, ma: 87.8, ua: 83.2, mttr: 2.75, mtbr: 19.8 },
-        { unitId: 'DT-4012', model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
-        { unitId: 'DZ-85', model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
+        { unitId: 'EX-1320', model: 'ZX870H-3F', wh: 182.0, bdUnsched: 10.0, freqUnsched: 4, bdSched: 8.0, stbyHrs: 12.0, pa: 91.0, ma: 94.8, ua: 91.0, mttr: 2.5, mtbr: 45.5 },
+        { unitId: 'EX-1351', model: 'ZX870H-3F', wh: 158.0, bdUnsched: 22.0, freqUnsched: 8, bdSched: 10.0, stbyHrs: 12.0, pa: 84.0, ma: 87.8, ua: 83.2, mttr: 2.75, mtbr: 19.8 },
+        { unitId: 'DT-4012', model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
+        { unitId: 'DZ-85', model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
       ]
     };
   }
