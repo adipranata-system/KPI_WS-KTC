@@ -869,7 +869,7 @@ const DashboardModule = {
     if (!tbody) return;
 
     if (list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-6 text-center text-sm text-slate-400">No model records found for this period.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" class="px-4 py-6 text-center text-sm text-slate-400">No model records found for this period.</td></tr>`;
       return;
     }
 
@@ -880,6 +880,7 @@ const DashboardModule = {
           <td class="px-3 py-2.5 font-bold text-slate-800">${m.model}</td>
           <td class="px-3 py-2.5 text-right">${m.wh.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right text-rose-600 font-medium">${m.bdUnsched.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right font-semibold text-slate-700">${Number(m.freqUnsched) || 0}</td>
           <td class="px-3 py-2.5 text-right text-amber-600">${m.bdSched.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${m.stbyHrs.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right font-bold ${m.pa >= target ? 'text-emerald-600' : 'text-rose-600'}">${m.pa.toFixed(2)}%</td>
@@ -932,7 +933,7 @@ const DashboardModule = {
     });
 
     if (list.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="11" class="px-4 py-6 text-center text-sm text-slate-400">No matching unit records found.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="12" class="px-4 py-6 text-center text-sm text-slate-400">No matching unit records found.</td></tr>`;
       return;
     }
 
@@ -944,6 +945,7 @@ const DashboardModule = {
           <td class="px-3 py-2 text-slate-600">${u.model}</td>
           <td class="px-3 py-2 text-right">${u.wh.toFixed(1)}</td>
           <td class="px-3 py-2 text-right text-rose-600 font-medium">${u.bdUnsched.toFixed(1)}</td>
+          <td class="px-3 py-2 text-right font-semibold text-slate-700">${Number(u.freqUnsched) || 0}</td>
           <td class="px-3 py-2 text-right text-amber-600">${u.bdSched.toFixed(1)}</td>
           <td class="px-3 py-2 text-right">${u.stbyHrs.toFixed(1)}</td>
           <td class="px-3 py-2 text-right font-bold ${u.pa >= target ? 'text-emerald-600' : 'text-rose-600'}">${u.pa.toFixed(2)}%</td>
@@ -965,7 +967,7 @@ const DashboardModule = {
     const btn = document.getElementById('btn-dash-export-csv');
     const startDate = document.getElementById('dash-start-date')?.value || 'report';
     const endDate = document.getElementById('dash-end-date')?.value || '';
-    const headers = ['Site', 'Period_From', 'Period_To', 'Unit_ID', 'Model', 'WH_Hrs', 'BD_Unsched_Hrs', 'BD_Sched_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
+    const headers = ['Site', 'Period_From', 'Period_To', 'Unit_ID', 'Model', 'WH_Hrs', 'BD_Unsched_Hrs', 'Freq_Unsched', 'BD_Sched_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
     const rows = (this.latestData.byUnit || []).map((u) => [
       AuthModule.currentSite,
       startDate,
@@ -974,6 +976,7 @@ const DashboardModule = {
       u.model,
       u.wh.toFixed(2),
       u.bdUnsched.toFixed(2),
+      Number(u.freqUnsched) || 0,
       u.bdSched.toFixed(2),
       u.stbyHrs.toFixed(2),
       u.pa.toFixed(2),
@@ -1201,7 +1204,7 @@ const HistoryModule = {
             </tr>`;
         })
         .join('');
-      if (totalEl) totalEl.textContent = `Total Logged Pure BD: ${totPure.toFixed(2)} Hrs (${matches.length} Damaged Unit${matches.length === 1 ? '' : 's'})`;
+      if (totalEl) totalEl.textContent = `Total Logged Pure BD: ${totPure.toFixed(2)} Hrs (${matches.length} Incident${matches.length === 1 ? '' : 's'})`;
     }
 
     modal.classList.remove('hidden');
@@ -1271,6 +1274,7 @@ const HistoryModule = {
           <th onclick="HistoryModule.sortBy('calHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Cal Hrs ${this.getSortIndicator('calHrs')}</th>
           <th onclick="HistoryModule.sortBy('wh')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">WH ${this.getSortIndicator('wh')}</th>
           <th onclick="HistoryModule.sortBy('bdUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Unsch ${this.getSortIndicator('bdUnsched')}</th>
+          <th onclick="HistoryModule.sortBy('freqUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Freq ${this.getSortIndicator('freqUnsched')}</th>
           <th onclick="HistoryModule.sortBy('bdSched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Sch ${this.getSortIndicator('bdSched')}</th>
           <th onclick="HistoryModule.sortBy('rainHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Rain ${this.getSortIndicator('rainHrs')}</th>
           <th onclick="HistoryModule.sortBy('stbyHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Standby ${this.getSortIndicator('stbyHrs')}</th>
@@ -1284,7 +1288,7 @@ const HistoryModule = {
       if (countBadge) countBadge.textContent = `${rows.length} Days`;
 
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="14" class="px-4 py-6 text-center text-sm text-slate-400">No historical records found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" class="px-4 py-6 text-center text-sm text-slate-400">No historical records found.</td></tr>`;
         tfoot.innerHTML = '';
         return;
       }
@@ -1308,6 +1312,7 @@ const HistoryModule = {
               <td class="px-3 py-2 text-right">${r.calHrs.toFixed(1)}</td>
               <td class="px-3 py-2 text-right font-semibold">${r.wh.toFixed(1)}</td>
               <td class="px-3 py-2 text-right">${unschCell}</td>
+              <td class="px-3 py-2 text-right font-semibold text-slate-700">${Number(r.freqUnsched) || 0}</td>
               <td class="px-3 py-2 text-right">${schCell}</td>
               <td class="px-3 py-2 text-right text-sky-600">${r.rainHrs.toFixed(1)}</td>
               <td class="px-3 py-2 text-right">${r.stbyHrs.toFixed(1)}</td>
@@ -1326,6 +1331,7 @@ const HistoryModule = {
           <td class="px-3 py-2.5 text-right">${agg.sumCal.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumWh.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumUnsch.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumFreq}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumSch.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumRain.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumStby.toFixed(1)}</td>
@@ -1344,6 +1350,7 @@ const HistoryModule = {
           <th onclick="HistoryModule.sortBy('calHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Cal Hrs ${this.getSortIndicator('calHrs')}</th>
           <th onclick="HistoryModule.sortBy('wh')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">WH ${this.getSortIndicator('wh')}</th>
           <th onclick="HistoryModule.sortBy('bdUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Unsch ${this.getSortIndicator('bdUnsched')}</th>
+          <th onclick="HistoryModule.sortBy('freqUnsched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Freq ${this.getSortIndicator('freqUnsched')}</th>
           <th onclick="HistoryModule.sortBy('bdSched')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">BD Sch ${this.getSortIndicator('bdSched')}</th>
           <th onclick="HistoryModule.sortBy('rainHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Rain ${this.getSortIndicator('rainHrs')}</th>
           <th onclick="HistoryModule.sortBy('stbyHrs')" class="px-3 py-2.5 text-right cursor-pointer hover:text-blue-600">Standby ${this.getSortIndicator('stbyHrs')}</th>
@@ -1357,7 +1364,7 @@ const HistoryModule = {
       if (countBadge) countBadge.textContent = `${rows.length} Unit-Days`;
 
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="14" class="px-4 py-6 text-center text-sm text-slate-400">No unit history records match the filter.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="15" class="px-4 py-6 text-center text-sm text-slate-400">No unit history records match the filter.</td></tr>`;
         tfoot.innerHTML = '';
         return;
       }
@@ -1382,6 +1389,7 @@ const HistoryModule = {
               <td class="px-3 py-2 text-right">${r.calHrs.toFixed(1)}</td>
               <td class="px-3 py-2 text-right font-semibold">${r.wh.toFixed(1)}</td>
               <td class="px-3 py-2 text-right">${unschCell}</td>
+              <td class="px-3 py-2 text-right font-semibold text-slate-700">${Number(r.freqUnsched) || 0}</td>
               <td class="px-3 py-2 text-right">${schCell}</td>
               <td class="px-3 py-2 text-right text-sky-600">${r.rainHrs.toFixed(1)}</td>
               <td class="px-3 py-2 text-right">${r.stbyHrs.toFixed(1)}</td>
@@ -1400,6 +1408,7 @@ const HistoryModule = {
           <td class="px-3 py-2.5 text-right">${agg.sumCal.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumWh.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumUnsch.toFixed(1)}</td>
+          <td class="px-3 py-2.5 text-right">${agg.sumFreq}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumSch.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumRain.toFixed(1)}</td>
           <td class="px-3 py-2.5 text-right">${agg.sumStby.toFixed(1)}</td>
@@ -1424,7 +1433,7 @@ const HistoryModule = {
     const rowsToExport = this.getFilteredRows();
 
     if (mode === 'DAILY') {
-      const headers = ['Site', 'Date', 'Day', 'On_Hired_Units', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
+      const headers = ['Site', 'Date', 'Day', 'On_Hired_Units', 'Cal_Hrs', 'WH', 'BD_Unsched', 'Freq_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
       const rows = rowsToExport.map((r) => [
         AuthModule.currentSite,
         r.date,
@@ -1433,6 +1442,7 @@ const HistoryModule = {
         r.calHrs,
         r.wh,
         r.bdUnsched,
+        Number(r.freqUnsched) || 0,
         r.bdSched,
         r.rainHrs,
         r.stbyHrs,
@@ -1444,7 +1454,7 @@ const HistoryModule = {
       ]);
       downloadCsvFile(`MPS_Daily_History_${AuthModule.currentSite}_${monthVal}.csv`, headers, rows, btn);
     } else {
-      const headers = ['Site', 'Date', 'Unit_ID', 'Model', 'Cal_Hrs', 'WH', 'BD_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
+      const headers = ['Site', 'Date', 'Unit_ID', 'Model', 'Cal_Hrs', 'WH', 'BD_Unsched', 'Freq_Unsched', 'BD_Sched', 'Rain_Hrs', 'Standby_Hrs', 'PA_Pct', 'MA_Pct', 'UA_Pct', 'MTTR_Hrs', 'MTBR_Hrs'];
       const rows = rowsToExport.map((r) => [
         AuthModule.currentSite,
         r.date,
@@ -1453,6 +1463,7 @@ const HistoryModule = {
         r.calHrs,
         r.wh,
         r.bdUnsched,
+        Number(r.freqUnsched) || 0,
         r.bdSched,
         r.rainHrs,
         r.stbyHrs,
@@ -1470,43 +1481,44 @@ const HistoryModule = {
 
 /* ============================================================================
  * 4. UPLOAD BREAKDOWN REPORT MODULE (DRAG & DROP, SHEET SELECT & DIAGNOSTICS)
- * ============================================================================ */
-const UploadExcelModule = {
-  workbook: null,
-  parsedRows: [],
-  cachedMatrix: null,
-  showAllRows: false,
-  diagnostics: {
-    totalDataRows: 0,
-    unmatchedUnits: [],
-    excludedByDate: 0
-  },
-
-  resetForm() {
-    this.workbook = null;
-    this.parsedRows = [];
-    this.cachedMatrix = null;
-    this.showAllRows = false;
-    this.diagnostics = { totalDataRows: 0, unmatchedUnits: [], excludedByDate: 0 };
-
-    const fileInput = document.getElementById('excel-file-input');
-    const sheetSelect = document.getElementById('excel-sheet-select');
-    const fromInput = document.getElementById('excel-filter-from');
-    const toInput = document.getElementById('excel-filter-to');
-    const searchInput = document.getElementById('excel-preview-search');
-    const dropTitle = document.getElementById('excel-drop-title');
-    const fileMeta = document.getElementById('excel-file-meta');
-    const diagBox = document.getElementById('excel-diagnostic-box');
-    const cards = document.getElementById('excel-summary-cards');
-    const progressWrap = document.getElementById('excel-progress-wrap');
-    const btnUpload = document.getElementById('btn-submit-excel');
-    const statusBox = document.getElementById('upload-status-msg');
-
-    if (fileInput) fileInput.value = '';
-    if (sheetSelect) {
-      sheetSelect.innerHTML = '<option value="">-- Load Excel File First --</option>';
-      sheetSelect.disabled = true;
-    }
+      trend: [
+        { date: '2026-11-08', dayName: 'Sunday', unitCount: 3, calHrs: 60, wh: 49.0, bdUnsched: 4.0, freqUnsched: 2, bdSched: 2.0, rainHrs: 1.0, stbyHrs: 4.0, pa: 90.0, ma: 92.45, ua: 90.74, mttr: 2.0, mtbr: 24.5 },
+        { date: '2026-11-09', dayName: 'Monday', unitCount: 3, calHrs: 60, wh: 47.0, bdUnsched: 5.0, freqUnsched: 2, bdSched: 2.8, rainHrs: 1.2, stbyHrs: 4.0, pa: 87.0, ma: 90.38, ua: 90.04, mttr: 2.5, mtbr: 23.5 },
+        { date: '2026-11-10', dayName: 'Tuesday', unitCount: 3, calHrs: 60, wh: 50.0, bdUnsched: 3.2, freqUnsched: 2, bdSched: 2.0, rainHrs: 0.8, stbyHrs: 4.0, pa: 91.33, ma: 93.98, ua: 91.24, mttr: 1.6, mtbr: 25.0 },
+        { date: '2026-11-11', dayName: 'Wednesday', unitCount: 3, calHrs: 60, wh: 44.0, bdUnsched: 6.3, freqUnsched: 2, bdSched: 3.0, rainHrs: 2.0, stbyHrs: 4.7, pa: 84.5, ma: 87.48, ua: 86.79, mttr: 3.15, mtbr: 22.0 },
+        { date: '2026-11-12', dayName: 'Thursday', unitCount: 3, calHrs: 60, wh: 48.0, bdUnsched: 4.2, freqUnsched: 2, bdSched: 2.5, rainHrs: 1.0, stbyHrs: 4.3, pa: 88.83, ma: 91.95, ua: 90.06, mttr: 2.1, mtbr: 24.0 },
+        { date: '2026-11-13', dayName: 'Friday', unitCount: 3, calHrs: 57, wh: 46.0, bdUnsched: 3.7, freqUnsched: 2, bdSched: 2.0, rainHrs: 1.3, stbyHrs: 4.0, pa: 90.0, ma: 92.56, ua: 89.67, mttr: 1.85, mtbr: 23.0 },
+        { date: '2026-11-14', dayName: 'Saturday', unitCount: 3, calHrs: 60, wh: 46.5, bdUnsched: 4.9, freqUnsched: 2, bdSched: 3.0, rainHrs: 1.0, stbyHrs: 4.6, pa: 86.83, ma: 90.47, ua: 89.25, mttr: 2.45, mtbr: 23.25 }
+      ],
+      pareto: [
+        { component: 'HYD - Hydraulic System', totalHours: 28.5 },
+        { component: 'ENG - Engine & Cooling', totalHours: 16.0 },
+        { component: 'UND - Undercarriage', totalHours: 13.5 }
+      ],
+      activeBreakdowns: [
+        {
+          unitId: 'DZ-85',
+          model: 'D85ESS-2',
+          startDate: '2026-11-12',
+          timeIn: '08:30',
+          code: 'USCH',
+          location: 'Pit North',
+          problem: 'Main hydraulic hose burst & final drive seal inspection'
+        }
+      ],
+      byModel: [
+        { model: 'ZX870H-3F', wh: 340.0, bdUnsched: 32.0, freqUnsched: 12, bdSched: 18.0, stbyHrs: 24.0, pa: 87.5, ma: 91.4, ua: 87.2, mttr: 2.67, mtbr: 28.3 },
+        { model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
+        { model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
+      ],
+      byUnit: [
+        { unitId: 'EX-1320', model: 'ZX870H-3F', wh: 182.0, bdUnsched: 10.0, freqUnsched: 4, bdSched: 8.0, stbyHrs: 12.0, pa: 91.0, ma: 94.8, ua: 91.0, mttr: 2.5, mtbr: 45.5 },
+        { unitId: 'EX-1351', model: 'ZX870H-3F', wh: 158.0, bdUnsched: 22.0, freqUnsched: 8, bdSched: 10.0, stbyHrs: 12.0, pa: 84.0, ma: 87.8, ua: 83.2, mttr: 2.75, mtbr: 19.8 },
+        { unitId: 'DT-4012', model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
+        { unitId: 'DZ-85', model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
+      ]
+    };
+  }
     if (fromInput) fromInput.value = '';
     if (toInput) toInput.value = '';
     if (searchInput) searchInput.value = '';
