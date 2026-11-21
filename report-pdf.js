@@ -392,6 +392,11 @@ const ReportModule = {
       bab1Parts.push(
         `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi On-Hired' : 'Model ' + filterModel}), kesiapan fisik armada (PA) site ${kpiRes.site} tercatat ${ov.pa.toFixed(2)}% atau tertinggal ${(target - ov.pa).toFixed(2)}% dari target ${target}%, dengan kelebihan waktu henti kerusakan sebesar ${excessBdHrs.toFixed(1)} jam di atas batas toleransi 15%.`
       );
+    }
+    bab1Parts.push(
+      `Dari total ${totalCal.toFixed(1)} jam jadwal kerja armada, unit beroperasi produktif selama ${ov.wh.toFixed(1)} jam (${whPct}%) dengan tingkat pemanfaatan unit siap pakai (UA) sebesar ${ov.ua.toFixed(2)}% dan rata-rata ketahanan unit sebelum kerusakan berikutnya (MTBR) mencapai ${ov.mtbr.toFixed(2)} jam.`
+    );
+
     // BAB II: Penjelasan Tren Harian, Top Model BD & Hukum Pareto 80/20
     const bab2Parts = [];
     if (bestDay && worstDay && trendList.length > 1) {
@@ -1934,22 +1939,6 @@ function getDemoApiResponse(action, payload, session) {
         { model: 'ZX870H-3F', wh: 340.0, bdUnsched: 32.0, bdSharePct: 55.2, freqUnsched: 12, bdSched: 18.0, stbyHrs: 24.0, topComponent: 'HYD - Hydraulic System (20.5j)', pa: 87.5, ma: 91.4, ua: 87.2, mttr: 2.67, mtbr: 28.3 },
         { model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, bdSharePct: 13.8, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, topComponent: 'ENG - Engine & Cooling (8.0j)', pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
         { model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, bdSharePct: 31.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, topComponent: 'UND - Undercarriage (13.5j)', pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
-      ],
-      activeBreakdowns: [
-        {
-          unitId: 'DZ-85',
-          model: 'D85ESS-2',
-          startDate: '2026-11-12',
-          timeIn: '08:30',
-          code: 'USCH',
-          location: 'Pit North',
-          problem: 'Main hydraulic hose burst & final drive seal inspection'
-        }
-      ],
-      byModel: [
-        { model: 'ZX870H-3F', wh: 340.0, bdUnsched: 32.0, freqUnsched: 12, bdSched: 18.0, stbyHrs: 24.0, pa: 87.5, ma: 91.4, ua: 87.2, mttr: 2.67, mtbr: 28.3 },
-        { model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
-        { model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
       ],
       byUnit: [
         { unitId: 'EX-1320', model: 'ZX870H-3F', wh: 182.0, bdUnsched: 10.0, freqUnsched: 4, bdSched: 8.0, stbyHrs: 12.0, pa: 91.0, ma: 94.8, ua: 91.0, mttr: 2.5, mtbr: 45.5 },
