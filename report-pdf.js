@@ -26,6 +26,7 @@ const ReportModule = {
   },
   trendChart: null,
   paretoChart: null,
+  modelTrendChart: null,
 
   init() {
     const startInput = document.getElementById('rep-start-date');
@@ -371,6 +372,8 @@ const ReportModule = {
 
     const lowestUnits = (kpiRes.byUnit || []).filter((u) => u.pa < target).sort((a, b) => a.pa - b.pa);
     const modelsSorted = [...(kpiRes.byModel || [])].sort((a, b) => b.pa - a.pa);
+    const modelsByBd = [...(kpiRes.byModel || [])].filter((m) => m.bdUnsched > 0).sort((a, b) => b.bdUnsched - a.bdUnsched);
+    const topBdModel = modelsByBd.length > 0 ? modelsByBd[0] : null;
     const openBds = kpiRes.activeBreakdowns || [];
     const openCount = openBds.length;
     const mutCount = (kpiRes.rosterMutations || []).length;
@@ -389,19 +392,16 @@ const ReportModule = {
       bab1Parts.push(
         `Berdasarkan ${scopeLabel} (${filterModel === 'ALL' ? 'Seluruh Populasi On-Hired' : 'Model ' + filterModel}), kesiapan fisik armada (PA) site ${kpiRes.site} tercatat ${ov.pa.toFixed(2)}% atau tertinggal ${(target - ov.pa).toFixed(2)}% dari target ${target}%, dengan kelebihan waktu henti kerusakan sebesar ${excessBdHrs.toFixed(1)} jam di atas batas toleransi 15%.`
       );
-    }
-    bab1Parts.push(
-      `Dari total ${totalCal.toFixed(1)} jam jadwal kerja armada, unit beroperasi produktif selama ${ov.wh.toFixed(1)} jam (${whPct}%), sementara kehilangan waktu terbagi pada kerusakan mendadak ${ov.bdUnsched.toFixed(1)} jam (${ov.freqUnsched} kejadian), servis terjadwal ${ov.bdSched.toFixed(1)} jam, cuaca hujan ${ov.rainHrs.toFixed(1)} jam, dan standby operasi ${ov.stbyHrs.toFixed(1)} jam.`
-    );
-    bab1Parts.push(
-      `Kecepatan rata-rata tim workshop menyelesaikan perbaikan (MTTR) tercatat ${ov.mttr.toFixed(2)} jam (${ov.mttr <= APP_CONFIG.MTTR_TARGET ? 'lebih cepat dari batas maksimal 4.0 jam' : 'melebihi batas 4.0 jam'}), dengan tingkat pemanfaatan unit siap pakai (UA) ${ov.ua.toFixed(2)}% dan ketahanan antar-kerusakan (MTBR) ${ov.mtbr.toFixed(2)} jam.`
-    );
-
-    // BAB II: Penjelasan Tren Harian & Hukum Pareto 80/20
+    // BAB II: Penjelasan Tren Harian, Top Model BD & Hukum Pareto 80/20
     const bab2Parts = [];
     if (bestDay && worstDay && trendList.length > 1) {
       bab2Parts.push(
         `Pergerakan tren harian menunjukkan performa kesiapan armada tertinggi dicapai pada tanggal ${bestDay.date} (PA ${Number(bestDay.pa).toFixed(2)}%), sedangkan titik penurunan terdalam terjadi pada tanggal ${worstDay.date} (PA ${Number(worstDay.pa).toFixed(2)}%) akibat akumulasi jam perbaikan pada hari tersebut.`
+      );
+    }
+    if (topBdModel) {
+      bab2Parts.push(
+        `Berdasarkan grafik tren breakdown per model, armada ${topBdModel.model} mencatatkan akumulasi Unscheduled Breakdown tertinggi sebesar ${topBdModel.bdUnsched.toFixed(1)} jam (kontribusi ${(Number(topBdModel.bdSharePct) || 0).toFixed(1)}% dari total downtime mendadak site) dengan pemicu utama pada ${topBdModel.topComponent || '-'}.`
       );
     }
     if (topComp && totParetoHrs > 0) {
@@ -424,8 +424,11 @@ const ReportModule = {
       const bestM = modelsSorted[0];
       const worstM = modelsSorted[modelsSorted.length - 1];
       if (modelsSorted.length > 1) {
+        const bdHighlight = topBdModel
+          ? `, sementara penyumbang jam Unscheduled BD terbesar berasal dari model ${topBdModel.model} (${topBdModel.bdUnsched.toFixed(1)} jam / ${(Number(topBdModel.bdSharePct) || 0).toFixed(1)}%, dominan ${topBdModel.topComponent || '-'})`
+          : '';
         bab3Parts.push(
-          `Secara komparasi antar-model, armada ${bestM.model} menjadi tulang punggung dengan kesiapan tertinggi (PA ${bestM.pa.toFixed(2)}%, MA ${bestM.ma.toFixed(2)}%), sedangkan model ${worstM.model} mencatatkan PA ${worstM.pa.toFixed(2)}% sehingga memerlukan pengawasan pemeliharaan lebih ketat.`
+          `Secara komparasi antar-model, armada ${bestM.model} menjadi tulang punggung dengan kesiapan tertinggi (PA ${bestM.pa.toFixed(2)}%, MA ${bestM.ma.toFixed(2)}%), sedangkan model ${worstM.model} mencatatkan PA ${worstM.pa.toFixed(2)}%${bdHighlight} sehingga memerlukan pengawasan pemeliharaan lebih ketat.`
         );
       } else {
         bab3Parts.push(
@@ -684,14 +687,16 @@ const ReportModule = {
     // 3.2 Model Summary Table + TOTAL / RATA-RATA Footer
     const byModel = this.kpiData.byModel || [];
     const tfootModel = document.getElementById('rep-tfoot-model');
+    const topGlobalComp = (this.kpiData.pareto && this.kpiData.pareto.length > 0) ? this.kpiData.pareto[0].component : '-';
     document.getElementById('rep-tbody-model').innerHTML = byModel.length === 0
-      ? `<tr><td colspan="11" class="px-3 py-3 text-center text-slate-400">Belum ada data pada periode evaluasi.</td></tr>`
+      ? `<tr><td colspan="13" class="px-3 py-3 text-center text-slate-400">Belum ada data pada periode evaluasi.</td></tr>`
       : byModel.map((m) => `
           <tr class="border-b border-slate-200">
             <td class="px-2.5 py-1.5 font-bold text-slate-900">${m.model}</td>
             <td class="px-2.5 py-1.5 text-right">${m.wh.toFixed(1)}</td>
-            <td class="px-2.5 py-1.5 text-right text-rose-700">${m.bdUnsched.toFixed(1)}</td>
+            <td class="px-2.5 py-1.5 text-right text-rose-700 font-semibold">${m.bdUnsched.toFixed(1)}</td>
             <td class="px-2.5 py-1.5 text-right font-semibold text-slate-800">${Number(m.freqUnsched) || 0}</td>
+            <td class="px-2.5 py-1.5 text-right font-semibold text-rose-700">${(Number(m.bdSharePct) || 0).toFixed(1)}%</td>
             <td class="px-2.5 py-1.5 text-right text-amber-700">${m.bdSched.toFixed(1)}</td>
             <td class="px-2.5 py-1.5 text-right">${m.stbyHrs.toFixed(1)}</td>
             <td class="px-2.5 py-1.5 text-right font-bold ${m.pa >= target ? 'text-emerald-700' : 'text-rose-700'}">${m.pa.toFixed(2)}%</td>
@@ -699,6 +704,7 @@ const ReportModule = {
             <td class="px-2.5 py-1.5 text-right font-bold ${m.ua >= target ? 'text-emerald-700' : 'text-rose-700'}">${m.ua.toFixed(2)}%</td>
             <td class="px-2.5 py-1.5 text-right">${m.mttr.toFixed(2)}j</td>
             <td class="px-2.5 py-1.5 text-right">${m.mtbr.toFixed(2)}j</td>
+            <td class="px-2.5 py-1.5 text-slate-700">${m.topComponent || '-'}</td>
           </tr>`).join('');
 
     if (tfootModel) {
@@ -708,6 +714,7 @@ const ReportModule = {
           <td class="px-2.5 py-1.5 text-right">${ov.wh.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.bdUnsched.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${Number(ov.freqUnsched) || 0}</td>
+          <td class="px-2.5 py-1.5 text-right">${ov.bdUnsched > 0 ? '100.0%' : '0.0%'}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.bdSched.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.stbyHrs.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.pa.toFixed(2)}%</td>
@@ -715,6 +722,7 @@ const ReportModule = {
           <td class="px-2.5 py-1.5 text-right">${ov.ua.toFixed(2)}%</td>
           <td class="px-2.5 py-1.5 text-right">${ov.mttr.toFixed(2)}j</td>
           <td class="px-2.5 py-1.5 text-right">${ov.mtbr.toFixed(2)}j</td>
+          <td class="px-2.5 py-1.5 font-normal text-slate-200">${topGlobalComp}</td>
         </tr>`;
     }
 
@@ -944,6 +952,79 @@ const ReportModule = {
           scales: {
             x: { ticks: { font: { size: 9 } } },
             y: { ticks: { font: { size: 9 } } }
+          }
+        },
+        plugins: [whiteBgPlugin]
+      });
+    }
+
+    // Gambar 2.3: Tren Harian Unscheduled Breakdown — Top 10 Model (Jam)
+    const modelTrendCanvas = document.getElementById('rep-chart-model-trend');
+    const modelTrendBadge = document.getElementById('rep-model-trend-badge');
+    if (modelTrendCanvas) {
+      if (this.modelTrendChart) this.modelTrendChart.destroy();
+
+      const mTrend = this.kpiData.modelTrend || { dates: [], series: [] };
+      const seriesList = (mTrend.series || []).slice(0, 10);
+      const dateLabels = (mTrend.dates || []).map((d) => String(d || '').slice(5));
+
+      if (modelTrendBadge) {
+        modelTrendBadge.textContent = seriesList.length > 0
+          ? `Menampilkan Top ${seriesList.length} Model Penyumbang BD Unscheduled`
+          : 'Tidak ada kejadian Unscheduled Breakdown pada periode ini';
+      }
+
+      const palette = [
+        '#e11d48', '#2563eb', '#d97706', '#059669', '#7c3aed',
+        '#0891b2', '#db2777', '#ea580c', '#4f46e5', '#0d9488'
+      ];
+
+      const datasets = seriesList.length > 0
+        ? seriesList.map((s, idx) => {
+            const color = palette[idx % palette.length];
+            return {
+              label: `${s.model} (${Number(s.totalBdUnsched || 0).toFixed(1)}j)`,
+              data: s.dailyHours || [],
+              borderColor: color,
+              backgroundColor: color + '18',
+              tension: 0.25,
+              borderWidth: 2,
+              pointRadius: 2.5
+            };
+          })
+        : [{
+            label: 'BD Unscheduled (0.0j)',
+            data: dateLabels.map(() => 0),
+            borderColor: '#94a3b8',
+            borderDash: [4, 4],
+            borderWidth: 1.5,
+            pointRadius: 0
+          }];
+
+      this.modelTrendChart = new Chart(modelTrendCanvas, {
+        type: 'line',
+        data: {
+          labels: dateLabels,
+          datasets: datasets
+        },
+        options: {
+          animation: false,
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { boxWidth: 10, padding: 8, font: { size: 9 } }
+            }
+          },
+          scales: {
+            y: {
+              min: 0,
+              ticks: { font: { size: 9 }, callback: (v) => v + 'j' }
+            },
+            x: {
+              ticks: { font: { size: 9 } }
+            }
           }
         },
         plugins: [whiteBgPlugin]
@@ -1285,6 +1366,20 @@ const ReportModule = {
         curY += chartH + 6.5;
       }
 
+      // Gambar 2.3 Tren Harian Unscheduled Breakdown — Top 10 Model (Weekly & Monthly)
+      const modelTrendCanvas = document.getElementById('rep-chart-model-trend');
+      if (modelTrendCanvas) {
+        const mChartH = isWeekly ? 40 : 46;
+        ensureSpace(mChartH + 8);
+        const modelTrendImg = modelTrendCanvas.toDataURL('image/jpeg', 0.85);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(7.8);
+        doc.setTextColor(15, 23, 42);
+        doc.text('Gambar 2.3 Tren Harian Unscheduled Breakdown - Top 10 Model (Jam)', margin, curY + 2);
+        doc.addImage(modelTrendImg, 'JPEG', margin, curY + 3.5, contentW, mChartH, undefined, 'FAST');
+        curY += mChartH + 6.5;
+      }
+
       // Monthly Detailed Pareto Table + Plain-Language AI Explanation for BAB II
       if (!isWeekly) {
         if ((this.kpiData.pareto || []).length > 0) {
@@ -1377,49 +1472,57 @@ const ReportModule = {
       doc.text('3.2 Rekapitulasi Performa Per Model Armada', margin, curY);
       curY += 2;
 
+      const topGlobalCompPdf = (this.kpiData.pareto && this.kpiData.pareto.length > 0)
+        ? sanitizePdfText(this.kpiData.pareto[0].component)
+        : '-';
       const modelRows = (this.kpiData.byModel || []).map((m) => [
         m.model,
         m.wh.toFixed(1),
         m.bdUnsched.toFixed(1),
         String(Number(m.freqUnsched) || 0),
+        `${(Number(m.bdSharePct) || 0).toFixed(1)}%`,
         m.bdSched.toFixed(1),
         m.stbyHrs.toFixed(1),
         `${m.pa.toFixed(2)}%`,
         `${m.ma.toFixed(2)}%`,
         `${m.ua.toFixed(2)}%`,
         `${m.mttr.toFixed(2)}j`,
-        `${m.mtbr.toFixed(2)}j`
+        `${m.mtbr.toFixed(2)}j`,
+        sanitizePdfText(m.topComponent || '-')
       ]);
 
       doc.autoTable({
         startY: curY,
         margin: { left: margin, right: margin },
-        head: [['Model Unit', 'WH (Jam)', 'BD Unsch', 'Freq', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR']],
-        body: modelRows.length > 0 ? modelRows : [['-', '0', '0', '0', '0', '0', '0%', '0%', '0%', '0j', '0j']],
+        head: [['Model Unit', 'WH (Jam)', 'BD Unsch', 'Freq', 'Kontribusi BD', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR', 'Komponen Dominan']],
+        body: modelRows.length > 0 ? modelRows : [['-', '0', '0', '0', '0.0%', '0', '0', '0%', '0%', '0%', '0j', '0j', '-']],
         foot: modelRows.length > 0 ? [[
           'TOTAL / RATA-RATA',
           ov.wh.toFixed(1),
           ov.bdUnsched.toFixed(1),
           String(Number(ov.freqUnsched) || 0),
+          ov.bdUnsched > 0 ? '100.0%' : '0.0%',
           ov.bdSched.toFixed(1),
           ov.stbyHrs.toFixed(1),
           `${ov.pa.toFixed(2)}%`,
           `${ov.ma.toFixed(2)}%`,
           `${ov.ua.toFixed(2)}%`,
           `${ov.mttr.toFixed(2)}j`,
-          `${ov.mtbr.toFixed(2)}j`
+          `${ov.mtbr.toFixed(2)}j`,
+          topGlobalCompPdf
         ]] : undefined,
         theme: 'grid',
-        styles: { fontSize: 7.3, cellPadding: 1.6 },
+        styles: { fontSize: 6.8, cellPadding: 1.4 },
         headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
         footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
         columnStyles: {
           1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
-          5: { halign: 'right' }, 6: { halign: 'right', fontStyle: 'bold' }, 7: { halign: 'right', fontStyle: 'bold' },
-          8: { halign: 'right', fontStyle: 'bold' }, 9: { halign: 'right' }, 10: { halign: 'right' }
+          5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' },
+          8: { halign: 'right', fontStyle: 'bold' }, 9: { halign: 'right', fontStyle: 'bold' },
+          10: { halign: 'right' }, 11: { halign: 'right' }
         },
         didParseCell: (data) => {
-          if (data.section === 'body' && [6, 7, 8].includes(data.column.index)) {
+          if (data.section === 'body' && [7, 8, 9].includes(data.column.index)) {
             const num = parseFloat(String(data.cell.raw || '0'));
             if (!isNaN(num)) {
               data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
@@ -1803,10 +1906,34 @@ function getDemoApiResponse(action, payload, session) {
         { date: '2026-11-13', dayName: 'Friday', unitCount: 3, calHrs: 57, wh: 46.0, bdUnsched: 3.7, freqUnsched: 2, bdSched: 2.0, rainHrs: 1.3, stbyHrs: 4.0, pa: 90.0, ma: 92.56, ua: 89.67, mttr: 1.85, mtbr: 23.0 },
         { date: '2026-11-14', dayName: 'Saturday', unitCount: 3, calHrs: 60, wh: 46.5, bdUnsched: 4.9, freqUnsched: 2, bdSched: 3.0, rainHrs: 1.0, stbyHrs: 4.6, pa: 86.83, ma: 90.47, ua: 89.25, mttr: 2.45, mtbr: 23.25 }
       ],
+      modelTrend: {
+        dates: ['2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14'],
+        series: [
+          { model: 'ZX870H-3F', totalBdUnsched: 32.0, bdSharePct: 55.2, topComponent: 'HYD - Hydraulic System (20.5j)', dailyHours: [2.5, 3.0, 2.0, 4.0, 2.5, 2.2, 3.0] },
+          { model: 'D85ESS-2', totalBdUnsched: 18.0, bdSharePct: 31.0, topComponent: 'UND - Undercarriage (13.5j)', dailyHours: [1.0, 1.5, 0.8, 1.5, 1.2, 1.0, 1.2] },
+          { model: 'CAT-777E', totalBdUnsched: 8.0, bdSharePct: 13.8, topComponent: 'ENG - Engine & Cooling (8.0j)', dailyHours: [0.5, 0.5, 0.4, 0.8, 0.5, 0.5, 0.7] }
+        ]
+      },
       pareto: [
         { component: 'HYD - Hydraulic System', totalHours: 28.5 },
         { component: 'ENG - Engine & Cooling', totalHours: 16.0 },
         { component: 'UND - Undercarriage', totalHours: 13.5 }
+      ],
+      activeBreakdowns: [
+        {
+          unitId: 'DZ-85',
+          model: 'D85ESS-2',
+          startDate: '2026-11-12',
+          timeIn: '08:30',
+          code: 'USCH',
+          location: 'Pit North',
+          problem: 'Main hydraulic hose burst & final drive seal inspection'
+        }
+      ],
+      byModel: [
+        { model: 'ZX870H-3F', wh: 340.0, bdUnsched: 32.0, bdSharePct: 55.2, freqUnsched: 12, bdSched: 18.0, stbyHrs: 24.0, topComponent: 'HYD - Hydraulic System (20.5j)', pa: 87.5, ma: 91.4, ua: 87.2, mttr: 2.67, mtbr: 28.3 },
+        { model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, bdSharePct: 13.8, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, topComponent: 'ENG - Engine & Cooling (8.0j)', pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
+        { model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, bdSharePct: 31.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, topComponent: 'UND - Undercarriage (13.5j)', pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
       ],
       activeBreakdowns: [
         {
