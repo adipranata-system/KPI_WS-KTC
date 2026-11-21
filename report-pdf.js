@@ -1425,8 +1425,9 @@ const ReportModule = {
       }
 
       // --- BAB III. EVALUASI PERFORMA ARMADA & STATUS BREAKDOWN ---
-      doc.addPage();
-      curY = 15;
+      // Fleksibel menyesuaikan sisa ruang halaman sebelumnya; pindah halaman hanya jika ruang tidak mencukupi
+      curY += 2;
+      ensureSpace(65);
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(10);
@@ -1520,6 +1521,7 @@ const ReportModule = {
         styles: { fontSize: 6.8, cellPadding: 1.4 },
         headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
         footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+        showFoot: 'lastPage',
         columnStyles: {
           1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
           5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' },
@@ -1671,6 +1673,7 @@ const ReportModule = {
           styles: { fontSize: 6.7, cellPadding: 1.3 },
           headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
           footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+          showFoot: 'lastPage',
           columnStyles: {
             2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
             6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right' }, 9: { halign: 'right' },
@@ -1713,7 +1716,7 @@ const ReportModule = {
       }
 
       // --- BAB IV. REKOMENDASI & LEMBAR PENGESAHAN ---
-      ensureSpace(72);
+      ensureSpace(52);
 
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
