@@ -3585,3 +3585,10 @@ const PopulationModule = {
     }
   }
 };
+
+/* ============================================================================
+ * 9. INITIALIZE APPLICATION ON WINDOW LOAD
+ * ============================================================================ */
+window.addEventListener('DOMContentLoaded', () => {
+  AuthModule.init();
+});
