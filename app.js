@@ -1490,7 +1490,9 @@ const UploadExcelModule = {
   diagnostics: {
     totalDataRows: 0,
     unmatchedUnits: [],
-    excludedByDate: 0
+    excludedByDate: 0,
+    excludedByEffectiveDate: 0,
+    effectiveDateUnits: []
   },
 
   resetForm() {
@@ -1498,7 +1500,13 @@ const UploadExcelModule = {
     this.parsedRows = [];
     this.cachedMatrix = null;
     this.showAllRows = false;
-    this.diagnostics = { totalDataRows: 0, unmatchedUnits: [], excludedByDate: 0 };
+    this.diagnostics = {
+      totalDataRows: 0,
+      unmatchedUnits: [],
+      excludedByDate: 0,
+      excludedByEffectiveDate: 0,
+      effectiveDateUnits: []
+    };
 
     const fileInput = document.getElementById('excel-file-input');
     const sheetSelect = document.getElementById('excel-sheet-select');
@@ -1689,7 +1697,13 @@ const UploadExcelModule = {
 
   extractBreakdownRows(matrix) {
     this.parsedRows = [];
-    this.diagnostics = { totalDataRows: 0, unmatchedUnits: [], excludedByDate: 0 };
+    this.diagnostics = {
+      totalDataRows: 0,
+      unmatchedUnits: [],
+      excludedByDate: 0,
+      excludedByEffectiveDate: 0,
+      effectiveDateUnits: []
+    };
     if (!matrix || matrix.length < 2) return;
 
     let headerRowIdx = -1;
@@ -1727,10 +1741,15 @@ const UploadExcelModule = {
     const normId = (s) => String(s || '').trim().toUpperCase().replace(/[\s\-_]+/g, '');
     const validUnitMap = {};
     (AuthModule.masterData.units || []).forEach((u) => {
-      validUnitMap[normId(u.unitId)] = { exactId: u.unitId, model: u.model };
+      validUnitMap[normId(u.unitId)] = {
+        exactId: u.unitId,
+        model: u.model,
+        effectiveDate: u.effectiveDate || ''
+      };
     });
 
     const unmatchedSet = new Set();
+    const effSkippedSet = new Set();
     const filterFrom = document.getElementById('excel-filter-from')?.value || '';
     const filterTo = document.getElementById('excel-filter-to')?.value || '';
     const todayYMD = this.formatExcelDate(new Date());
@@ -1766,9 +1785,16 @@ const UploadExcelModule = {
       const codeComponent = colIdx.codeComp !== -1 ? String(row[colIdx.codeComp] || '').trim().toUpperCase() : '';
 
       const segments = this.splitDailySegments(startDate, timeIn, endDate, rawTimeOut, isReady);
+      let keptForIncident = 0;
       segments.forEach((seg) => {
         if ((filterFrom && seg.date < filterFrom) || (filterTo && seg.date > filterTo)) {
           this.diagnostics.excludedByDate += 1;
+          return;
+        }
+
+        if (matchedUnit.effectiveDate && seg.date < matchedUnit.effectiveDate) {
+          this.diagnostics.excludedByEffectiveDate += 1;
+          effSkippedSet.add(`${unitId} (Eff. ${matchedUnit.effectiveDate})`);
           return;
         }
 
@@ -1785,12 +1811,14 @@ const UploadExcelModule = {
           timeOut: seg.timeOut,
           pureHours: seg.pureHours,
           codeComponent: codeComponent,
-          isCarryOver: Boolean(seg.isCarryOver)
+          isCarryOver: keptForIncident > 0 && Boolean(seg.isCarryOver)
         });
+        keptForIncident += 1;
       });
     }
 
     this.diagnostics.unmatchedUnits = Array.from(unmatchedSet).sort();
+    this.diagnostics.effectiveDateUnits = Array.from(effSkippedSet).sort();
   },
 
   renderDiagnostics() {
@@ -1800,7 +1828,7 @@ const UploadExcelModule = {
     if (!diagBox || !diagTitle || !diagBody) return;
 
     const session = getUserSession();
-    const { totalDataRows, unmatchedUnits, excludedByDate } = this.diagnostics;
+    const { totalDataRows, unmatchedUnits, excludedByDate, excludedByEffectiveDate, effectiveDateUnits } = this.diagnostics;
 
     if (session && session.isPreviewMode && totalDataRows > 0 && this.parsedRows.length === 0) {
       diagBox.classList.remove('hidden');
@@ -1809,7 +1837,7 @@ const UploadExcelModule = {
       return;
     }
 
-    if (unmatchedUnits.length > 0 || (totalDataRows > 0 && this.parsedRows.length === 0)) {
+    if (unmatchedUnits.length > 0 || excludedByEffectiveDate > 0 || (totalDataRows > 0 && this.parsedRows.length === 0)) {
       diagBox.classList.remove('hidden');
       diagTitle.textContent = `Workbook Parsing Summary (${totalDataRows} Data Rows Scanned)`;
       const msgs = [];
@@ -1817,6 +1845,10 @@ const UploadExcelModule = {
         const previewList = unmatchedUnits.slice(0, 12).join(', ');
         const more = unmatchedUnits.length > 12 ? ` (+${unmatchedUnits.length - 12} more)` : '';
         msgs.push(`Skipped ${unmatchedUnits.length} Unit ID(s) not active in site ${AuthModule.currentSite} (check Unit Population or selected Site): ${previewList}${more}.`);
+      }
+      if (excludedByEffectiveDate > 0) {
+        const effList = (effectiveDateUnits || []).join(', ');
+        msgs.push(`Skipped ${excludedByEffectiveDate} daily segment(s) prior to unit On-Hired Effective Date: ${effList}. Only segments on or after the Effective Date are included.`);
       }
       if (excludedByDate > 0) {
         msgs.push(`${excludedByDate} daily segment(s) excluded by the From/To Date filter.`);
@@ -2132,6 +2164,7 @@ const InputHmModule = {
   dayName: '',
   isFriday: false,
   shortcutsBound: false,
+  activeUnitsForDate: null,
   lastHmMap: {},
   lastHmInfoMap: {},
   breakdownMap: { DAY: {}, NIGHT: {} },
@@ -2143,6 +2176,17 @@ const InputHmModule = {
   operations: {
     DAY: [],
     NIGHT: []
+  },
+
+  getEffectiveUnitsForSelectedDate() {
+    if (Array.isArray(this.activeUnitsForDate)) {
+      return this.activeUnitsForDate;
+    }
+    const selDate = this.selectedDate;
+    return (AuthModule.masterData.units || []).filter((u) => {
+      if (selDate && u.effectiveDate && selDate < u.effectiveDate) return false;
+      return true;
+    });
   },
 
   formatShortDate(ymd) {
@@ -2227,10 +2271,18 @@ const InputHmModule = {
     if (res.status === 'success') {
       this.dayName = res.dayName || '';
       this.isFriday = Boolean(res.isFriday);
+      this.activeUnitsForDate = Array.isArray(res.activeUnits) ? res.activeUnits : null;
       this.lastHmMap = res.lastHmMap || {};
       this.lastHmInfoMap = res.lastHmInfoMap || {};
       this.breakdownMap = res.breakdownMap || { DAY: {}, NIGHT: {} };
       this.monthlyStatus = res.monthlyStatus || {};
+
+      const dl = document.getElementById('datalist-active-units');
+      if (dl) {
+        dl.innerHTML = this.getEffectiveUnitsForSelectedDate()
+          .map((u) => `<option value="${u.unitId}">${u.model} (${u.status})</option>`)
+          .join('');
+      }
 
       this.shifts = {
         DAY: res.shifts?.DAY || { isWorking: true, standardHours: this.isFriday ? 9 : 10, rainHours: 0 },
@@ -2358,12 +2410,12 @@ const InputHmModule = {
       this.toggleShiftWorking(shiftName, true);
     }
 
-    // Only auto-fill units with status 'W' (Working); 'SW' (Standby Working) units remain Standby
-    const workingUnits = (AuthModule.masterData.units || []).filter(
+    // Only auto-fill units with status 'W' (Working) effective on selectedDate; 'SW' units remain Standby
+    const workingUnits = this.getEffectiveUnitsForSelectedDate().filter(
       (u) => String(u.status || '').trim().toUpperCase() === 'W'
     );
     if (workingUnits.length === 0) {
-      showToast(`No Working (W) units found for site ${AuthModule.currentSite}. Standby Working (SW) units are excluded from auto-fill.`, 'warning');
+      showToast(`No Working (W) units found for site ${AuthModule.currentSite} on ${this.selectedDate}. Standby Working (SW) units are excluded from auto-fill.`, 'warning');
       return;
     }
 
@@ -2461,7 +2513,9 @@ const InputHmModule = {
 
     if (field === 'unitId') {
       const cleanId = String(value || '').trim();
-      const found = (AuthModule.masterData.units || []).find((u) => u.unitId.toLowerCase() === cleanId.toLowerCase());
+      const effectiveList = this.getEffectiveUnitsForSelectedDate();
+      const found = effectiveList.find((u) => u.unitId.toLowerCase() === cleanId.toLowerCase()) ||
+        (AuthModule.masterData.units || []).find((u) => u.unitId.toLowerCase() === cleanId.toLowerCase());
       if (found) {
         row.unitId = found.unitId;
         row.model = found.model;
@@ -2758,7 +2812,7 @@ const InputHmModule = {
   },
 
   updateLiveSummary() {
-    const activeCount = (AuthModule.masterData.units || []).length;
+    const activeCount = this.getEffectiveUnitsForSelectedDate().length;
     const sumWh = (list) => list.reduce((acc, r) => acc + Math.max(0, Number(r.wh) || 0), 0);
     const dayWh = this.shifts.DAY.isWorking ? sumWh(this.operations.DAY) : 0;
     const nightWh = this.shifts.NIGHT.isWorking ? sumWh(this.operations.NIGHT) : 0;
