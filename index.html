@@ -1046,8 +1046,8 @@
 
         <div id="pop-status-msg" class="text-sm"></div>
 
-        <!-- 4 Fleet Status Summary Cards (On-Hired vs Off-Hired) -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <!-- 5 Fleet Status & On-Hired Shift Summary Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           <div class="bg-white p-3.5 rounded-xl border border-emerald-200 flex items-center justify-between">
             <div>
               <div class="text-xs font-bold text-slate-800">Working (W)</div>
@@ -1062,19 +1062,26 @@
             </div>
             <span id="pop-count-sw" class="text-xl font-extrabold text-blue-600">0</span>
           </div>
-          <div class="bg-white p-3.5 rounded-xl border border-amber-200 flex items-center justify-between">
+          <div class="bg-white p-3.5 rounded-xl border border-indigo-200 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-800">On-Hired: 2 Shift</div>
+              <div class="text-[10px] font-semibold text-indigo-700">Day &amp; Night (20h/hari)</div>
+            </div>
+            <span id="pop-count-2shift" class="text-xl font-extrabold text-indigo-600">0</span>
+          </div>
+          <div class="bg-white p-3.5 rounded-xl border border-teal-200 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-800">On-Hired: 1 Shift</div>
+              <div class="text-[10px] font-semibold text-teal-700">Day Only (10h/hari)</div>
+            </div>
+            <span id="pop-count-1shift" class="text-xl font-extrabold text-teal-600">0</span>
+          </div>
+          <div class="bg-white p-3.5 rounded-xl border border-amber-200 flex items-center justify-between col-span-2 sm:col-span-1">
             <div>
               <div class="text-xs font-bold text-slate-800">Off Hired (OH)</div>
               <div class="text-[10px] font-semibold text-amber-700">Yard / Long BD &bull; Excluded</div>
             </div>
             <span id="pop-count-oh" class="text-xl font-extrabold text-amber-600">0</span>
-          </div>
-          <div class="bg-white p-3.5 rounded-xl border border-rose-200 flex items-center justify-between">
-            <div>
-              <div class="text-xs font-bold text-slate-800">Scrap / Demob (S)</div>
-              <div class="text-[10px] font-semibold text-rose-700">Inactive &bull; Excluded</div>
-            </div>
-            <span id="pop-count-s" class="text-xl font-extrabold text-rose-600">0</span>
           </div>
         </div>
 
@@ -1860,7 +1867,7 @@
   </div>
 
   <!-- External Application Logic Bundle (Split into Core + Report/PDF Module) -->
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
   <script src="report-pdf.js?v=23"></script>
 </body>
 </html>
