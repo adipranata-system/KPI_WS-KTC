@@ -3251,19 +3251,34 @@ const PopulationModule = {
 
     const allUnits = this.rosterUnits || [];
     const counts = { W: 0, SW: 0, OH: 0, S: 0 };
+    let twoShiftOnHired = 0;
+    let oneShiftOnHired = 0;
+
     allUnits.forEach((u) => {
       if (counts[u.status] !== undefined) counts[u.status] += 1;
+      if (['W', 'SW'].includes(u.status)) {
+        if ((u.shiftPattern || '2_SHIFT') === '1_SHIFT') {
+          oneShiftOnHired += 1;
+        } else {
+          twoShiftOnHired += 1;
+        }
+      }
     });
 
-    document.getElementById('pop-count-w').textContent = counts.W;
-    document.getElementById('pop-count-sw').textContent = counts.SW;
-    document.getElementById('pop-count-oh').textContent = counts.OH;
-    document.getElementById('pop-count-s').textContent = counts.S;
+    const setCardCount = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    };
+
+    setCardCount('pop-count-w', counts.W);
+    setCardCount('pop-count-sw', counts.SW);
+    setCardCount('pop-count-2shift', twoShiftOnHired);
+    setCardCount('pop-count-1shift', oneShiftOnHired);
+    setCardCount('pop-count-oh', counts.OH);
 
     const onHiredTotal = counts.W + counts.SW;
-    const oneShiftOnHired = allUnits.filter((u) => ['W', 'SW'].includes(u.status) && u.shiftPattern === '1_SHIFT').length;
     if (badge) {
-      const shiftNote = oneShiftOnHired > 0 ? ` • ${oneShiftOnHired} x 1-Shift` : '';
+      const shiftNote = ` • ${twoShiftOnHired} x 2-Shift, ${oneShiftOnHired} x 1-Shift`;
       badge.textContent = `${onHiredTotal} On-Hired / ${allUnits.length} Total (${AuthModule.currentSite}${shiftNote})`;
     }
 
