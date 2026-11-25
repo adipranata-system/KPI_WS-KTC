@@ -463,7 +463,10 @@ const AuthModule = {
     const dl = document.getElementById('datalist-active-units');
     if (!dl) return;
     dl.innerHTML = (this.masterData.units || [])
-      .map((u) => `<option value="${u.unitId}">${u.model} (${u.status})</option>`)
+      .map((u) => {
+        const shiftTag = u.shiftPattern === '1_SHIFT' ? ' • 1 Shift' : '';
+        return `<option value="${u.unitId}">${u.model} (${u.status}${shiftTag})</option>`;
+      })
       .join('');
   },
 
@@ -2178,6 +2181,12 @@ const InputHmModule = {
     NIGHT: []
   },
 
+  normalizeShiftPattern(rawPattern) {
+    const sp = String(rawPattern || '').trim().toUpperCase();
+    if (sp === '1_SHIFT' || sp === '1 SHIFT' || sp === 'DAY_ONLY' || sp === '1') return '1_SHIFT';
+    return '2_SHIFT';
+  },
+
   getEffectiveUnitsForSelectedDate() {
     if (Array.isArray(this.activeUnitsForDate)) {
       return this.activeUnitsForDate;
@@ -2187,6 +2196,22 @@ const InputHmModule = {
       if (selDate && u.effectiveDate && selDate < u.effectiveDate) return false;
       return true;
     });
+  },
+
+  getUnitMeta(unitId) {
+    const uid = String(unitId || '').trim().toLowerCase();
+    if (!uid) return null;
+    return (
+      this.getEffectiveUnitsForSelectedDate().find((u) => u.unitId.toLowerCase() === uid) ||
+      (AuthModule.masterData.units || []).find((u) => u.unitId.toLowerCase() === uid) ||
+      (AuthModule.masterData.allSiteUnits || []).find((u) => u.unitId.toLowerCase() === uid) ||
+      null
+    );
+  },
+
+  isOneShiftUnit(unitId) {
+    const meta = this.getUnitMeta(unitId);
+    return meta ? this.normalizeShiftPattern(meta.shiftPattern) === '1_SHIFT' : false;
   },
 
   formatShortDate(ymd) {
@@ -2280,7 +2305,10 @@ const InputHmModule = {
       const dl = document.getElementById('datalist-active-units');
       if (dl) {
         dl.innerHTML = this.getEffectiveUnitsForSelectedDate()
-          .map((u) => `<option value="${u.unitId}">${u.model} (${u.status})</option>`)
+          .map((u) => {
+            const shiftTag = this.normalizeShiftPattern(u.shiftPattern) === '1_SHIFT' ? ' • 1 Shift' : '';
+            return `<option value="${u.unitId}">${u.model} (${u.status}${shiftTag})</option>`;
+          })
           .join('');
       }
 
@@ -2410,12 +2438,21 @@ const InputHmModule = {
       this.toggleShiftWorking(shiftName, true);
     }
 
-    // Only auto-fill units with status 'W' (Working) effective on selectedDate; 'SW' units remain Standby
-    const workingUnits = this.getEffectiveUnitsForSelectedDate().filter(
-      (u) => String(u.status || '').trim().toUpperCase() === 'W'
-    );
+    // Only auto-fill units with status 'W' (Working) effective on selectedDate;
+    // On NIGHT shift, exclude 1_SHIFT (Day Only) units automatically (can still be added via + Row for overtime)
+    const workingUnits = this.getEffectiveUnitsForSelectedDate().filter((u) => {
+      if (String(u.status || '').trim().toUpperCase() !== 'W') return false;
+      if (shiftName === 'NIGHT' && this.normalizeShiftPattern(u.shiftPattern) === '1_SHIFT') return false;
+      return true;
+    });
+
     if (workingUnits.length === 0) {
-      showToast(`No Working (W) units found for site ${AuthModule.currentSite} on ${this.selectedDate}. Standby Working (SW) units are excluded from auto-fill.`, 'warning');
+      showToast(
+        shiftName === 'NIGHT'
+          ? `No 2-Shift Working (W) units found for site ${AuthModule.currentSite} on ${this.selectedDate}. 1-Shift (Day Only) units are excluded from Night auto-fill.`
+          : `No Working (W) units found for site ${AuthModule.currentSite} on ${this.selectedDate}. Standby Working (SW) units are excluded from auto-fill.`,
+        'warning'
+      );
       return;
     }
 
@@ -2457,7 +2494,7 @@ const InputHmModule = {
     this.quickFillActiveUnits('DAY', false);
     this.quickFillActiveUnits('NIGHT', false);
     setTimeout(() => this.focusFirstInput('DAY'), 20);
-    showToast('Populated Working (W) units for Day & Night shifts (SW units remain Standby).', 'info');
+    showToast('Populated Working (W) units for Day & Night shifts (1-Shift units excluded from Night auto-fill).', 'info');
   },
 
   addUnitRow(shiftName, autoFocus = false) {
@@ -2559,7 +2596,8 @@ const InputHmModule = {
       if (!row) return;
 
       const maxQuota = shiftName === 'DAY' && this.isFriday ? 9 : 10;
-      const bdHrs = this.breakdownMap[shiftName]?.[row.unitId]?.hours || 0;
+      const isNightOneShift = (shiftName === 'NIGHT' && this.isOneShiftUnit(row.unitId));
+      const bdHrs = isNightOneShift ? 0 : (this.breakdownMap[shiftName]?.[row.unitId]?.hours || 0);
       const availQuota = Math.max(0, Math.round((maxQuota - bdHrs) * 100) / 100);
       const startVal = parseFloat(row.hmStart);
 
@@ -2633,7 +2671,9 @@ const InputHmModule = {
   buildRowStatusHtml(shiftName, row, idx) {
     const maxQuota = shiftName === 'DAY' && this.isFriday ? 9 : 10;
     const expectedStart = this.getExpectedStartHm(shiftName, row.unitId);
-    const bdInfo = row.unitId ? this.breakdownMap[shiftName]?.[row.unitId] : null;
+    const isOneShift = this.isOneShiftUnit(row.unitId);
+    const isNightOneShift = (shiftName === 'NIGHT' && isOneShift);
+    const bdInfo = (row.unitId && !isNightOneShift) ? this.breakdownMap[shiftName]?.[row.unitId] : null;
     const start = parseFloat(row.hmStart);
     const end = parseFloat(row.hmEnd);
 
@@ -2670,6 +2710,12 @@ const InputHmModule = {
       : '';
 
     const badges = [];
+    if (isNightOneShift) {
+      badges.push(`<span class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded text-[10px]">1-Shift Overtime (Actual +Tcal)</span>`);
+    } else if (isOneShift && shiftName === 'DAY') {
+      badges.push(`<span class="inline-block px-1.5 py-0.5 bg-slate-100 text-slate-600 border border-slate-200 font-semibold rounded text-[10px]">1 Shift</span>`);
+    }
+
     if (bdInfo && bdInfo.hours > 0) {
       badges.push(`<span class="px-1.5 py-0.5 bg-rose-100 text-rose-700 font-bold rounded text-[10px]">BD ${bdInfo.hours}h (${bdInfo.codes.join('/')})</span>`);
     }
@@ -2698,7 +2744,7 @@ const InputHmModule = {
         if (gap === 0 && expectedStart !== null && !row.hmReset) {
           badges.push(`<span class="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-950 border border-amber-300 font-semibold rounded text-[10px]">&#9888; +${diff.toFixed(1)}h jump vs Prev ${expectedStart} (${lastDateText})</span>`);
         }
-      } else {
+      } else if (!isNightOneShift) {
         const rem = Math.max(0, Math.round((maxQuota - diff - (bdInfo?.hours || 0)) * 100) / 100);
         badges.push(`<span class="text-[11px] text-slate-500">${rem > 0 ? `Stby ${rem}h` : 'Full'}</span>`);
       }
@@ -2812,18 +2858,23 @@ const InputHmModule = {
   },
 
   updateLiveSummary() {
-    const activeCount = this.getEffectiveUnitsForSelectedDate().length;
+    const effectiveList = this.getEffectiveUnitsForSelectedDate();
+    const activeCount = effectiveList.length;
+    const oneShiftCount = effectiveList.filter((u) => this.normalizeShiftPattern(u.shiftPattern) === '1_SHIFT').length;
+    const twoShiftCount = activeCount - oneShiftCount;
+
     const sumWh = (list) => list.reduce((acc, r) => acc + Math.max(0, Number(r.wh) || 0), 0);
     const dayWh = this.shifts.DAY.isWorking ? sumWh(this.operations.DAY) : 0;
     const nightWh = this.shifts.NIGHT.isWorking ? sumWh(this.operations.NIGHT) : 0;
     const totWh = dayWh + nightWh;
-    const rainPop = ((this.shifts.DAY.isWorking ? Number(this.shifts.DAY.rainHours) || 0 : 0) +
-      (this.shifts.NIGHT.isWorking ? Number(this.shifts.NIGHT.rainHours) || 0 : 0)) * activeCount;
+    const rainPop = ((this.shifts.DAY.isWorking ? Number(this.shifts.DAY.rainHours) || 0 : 0) * activeCount) +
+      ((this.shifts.NIGHT.isWorking ? Number(this.shifts.NIGHT.rainHours) || 0 : 0) * twoShiftCount);
 
     const summaryEl = document.getElementById('op-live-summary');
     const statusEl = document.getElementById('op-status-msg');
     if (summaryEl) {
-      summaryEl.textContent = `On-Hired Population: ${activeCount} Units | Day WH: ${dayWh.toFixed(1)}h | Night WH: ${nightWh.toFixed(1)}h | Total WH: ${totWh.toFixed(1)}h | Est. Fleet Rain: ${rainPop.toFixed(1)}h`;
+      const popDetail = oneShiftCount > 0 ? ` (${twoShiftCount} x 2-Shift, ${oneShiftCount} x 1-Shift)` : '';
+      summaryEl.textContent = `On-Hired Population: ${activeCount} Units${popDetail} | Day WH: ${dayWh.toFixed(1)}h | Night WH: ${nightWh.toFixed(1)}h | Total WH: ${totWh.toFixed(1)}h | Est. Fleet Rain: ${rainPop.toFixed(1)}h`;
     }
     if (statusEl && this.selectedDate) {
       const hasRows = this.operations.DAY.length > 0 || this.operations.NIGHT.length > 0;
@@ -3024,15 +3075,20 @@ const PopulationModule = {
 
   applyRosterPayload(res, targetMonth) {
     this.forceOverride = false;
-    this.rosterUnits = (res.allSiteUnits || []).map((u) => ({
-      ...u,
-      _origStatus: u.status,
-      _origPending: Boolean(u.pendingOffHire),
-      _origReplaced: u.replacedUnitId || '',
-      _origReason: u.reason || '',
-      _origEffectiveDate: u.effectiveDate || '',
-      pullInType: u.pullInType || ''
-    }));
+    this.rosterUnits = (res.allSiteUnits || []).map((u) => {
+      const sp = u.shiftPattern === '1_SHIFT' ? '1_SHIFT' : '2_SHIFT';
+      return {
+        ...u,
+        shiftPattern: sp,
+        _origStatus: u.status,
+        _origPending: Boolean(u.pendingOffHire),
+        _origReplaced: u.replacedUnitId || '',
+        _origReason: u.reason || '',
+        _origEffectiveDate: u.effectiveDate || '',
+        _origShiftPattern: sp,
+        pullInType: u.pullInType || ''
+      };
+    });
     this.auditLogs = res.auditLogs || [];
     this.lockState = res.lockState || {
       mode: 'GRACE_PERIOD',
@@ -3205,13 +3261,17 @@ const PopulationModule = {
     document.getElementById('pop-count-s').textContent = counts.S;
 
     const onHiredTotal = counts.W + counts.SW;
+    const oneShiftOnHired = allUnits.filter((u) => ['W', 'SW'].includes(u.status) && u.shiftPattern === '1_SHIFT').length;
     if (badge) {
-      badge.textContent = `${onHiredTotal} On-Hired / ${allUnits.length} Total (${AuthModule.currentSite})`;
+      const shiftNote = oneShiftOnHired > 0 ? ` • ${oneShiftOnHired} x 1-Shift` : '';
+      badge.textContent = `${onHiredTotal} On-Hired / ${allUnits.length} Total (${AuthModule.currentSite}${shiftNote})`;
     }
 
     const filtered = allUnits.filter((u) => {
       if (statusFilter === 'ON_HIRED' && !['W', 'SW'].includes(u.status)) return false;
       if (statusFilter === 'PENDING_OH' && !u.pendingOffHire) return false;
+      if (statusFilter === '1_SHIFT' && (u.shiftPattern || '2_SHIFT') !== '1_SHIFT') return false;
+      if (statusFilter === '2_SHIFT' && (u.shiftPattern || '2_SHIFT') !== '2_SHIFT') return false;
       if (['W', 'SW', 'OH', 'S'].includes(statusFilter) && u.status !== statusFilter) return false;
 
       if (searchVal) {
@@ -3226,7 +3286,7 @@ const PopulationModule = {
     });
 
     if (filtered.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-6 text-center text-sm text-slate-400">No units match the current filter.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-6 text-center text-sm text-slate-400">No units match the current filter.</td></tr>`;
       return;
     }
 
@@ -3247,12 +3307,14 @@ const PopulationModule = {
         const isScrap = u.status === 'S';
         const isOffHired = u.status === 'OH';
         const isOnHired = ['W', 'SW'].includes(u.status);
+        const curShiftPattern = u.shiftPattern === '1_SHIFT' ? '1_SHIFT' : '2_SHIFT';
         const isModified =
           u.status !== u._origStatus ||
           Boolean(u.pendingOffHire) !== u._origPending ||
           (u.replacedUnitId || '') !== u._origReplaced ||
           (u.reason || '') !== u._origReason ||
-          (u.effectiveDate || '') !== (u._origEffectiveDate || '');
+          (u.effectiveDate || '') !== (u._origEffectiveDate || '') ||
+          curShiftPattern !== (u._origShiftPattern || '2_SHIFT');
 
         const rowCls = isModified
           ? 'bg-blue-50/60'
@@ -3268,6 +3330,10 @@ const PopulationModule = {
           OH: 'border-amber-300 bg-amber-50 text-amber-800',
           S: 'border-rose-300 bg-rose-50 text-rose-700'
         }[u.status] || 'border-slate-300 bg-white';
+
+        const shiftSelectStyle = curShiftPattern === '1_SHIFT'
+          ? 'border-amber-300 bg-amber-50 text-amber-900'
+          : 'border-slate-300 bg-white text-slate-800';
 
         // Determine allowed dropdown options based on monthly lock state
         let allowedOptions = statusOptions;
@@ -3286,6 +3352,13 @@ const PopulationModule = {
         const opts = allowedOptions
           .map((o) => `<option value="${o.val}" ${u.status === o.val ? 'selected' : ''}>${o.label}</option>`)
           .join('');
+
+        // Shift Pattern Dropdown (Always flexible unless period is Frozen/Next-Month-Locked)
+        const disableShiftSelect = isFrozen || isScrap;
+        const shiftOpts = `
+          <option value="2_SHIFT" ${curShiftPattern === '2_SHIFT' ? 'selected' : ''}>2 Shift (Day &amp; Night)</option>
+          <option value="1_SHIFT" ${curShiftPattern === '1_SHIFT' ? 'selected' : ''}>1 Shift (Day Only)</option>
+        `;
 
         // Governance & Mutation Notes Column
         let govHtml = '';
@@ -3346,6 +3419,13 @@ const PopulationModule = {
                 ${opts}
               </select>
             </td>
+            <td class="px-4 py-2">
+              <select ${disableShiftSelect ? 'disabled' : ''}
+                onchange="PopulationModule.onInlineShiftPatternChange('${u.unitId}', this.value)"
+                class="px-2.5 py-1 text-xs font-semibold rounded border focus:outline-none disabled:opacity-75 ${shiftSelectStyle}">
+                ${shiftOpts}
+              </select>
+            </td>
             <td class="px-4 py-2">${govHtml}</td>
           </tr>`;
       })
@@ -3359,6 +3439,13 @@ const PopulationModule = {
     if (!['W', 'SW'].includes(newStatus)) {
       target.pendingOffHire = false;
     }
+    this.renderTable();
+  },
+
+  onInlineShiftPatternChange(unitId, newPattern) {
+    const target = this.rosterUnits.find((u) => u.unitId === unitId);
+    if (!target) return;
+    target.shiftPattern = newPattern === '1_SHIFT' ? '1_SHIFT' : '2_SHIFT';
     this.renderTable();
   },
 
@@ -3403,6 +3490,7 @@ const PopulationModule = {
     const pullFields = document.getElementById('modal-roster-pull-fields');
     const pullTypeSelect = document.getElementById('modal-roster-pull-type');
     const effDateInput = document.getElementById('modal-roster-effective-date');
+    const shiftPatternSelect = document.getElementById('modal-roster-shift-pattern');
     const replacedSelect = document.getElementById('modal-roster-replaced-unit');
     const reasonInput = document.getElementById('modal-roster-reason');
 
@@ -3426,6 +3514,10 @@ const PopulationModule = {
       if (pullTypeSelect) {
         pullTypeSelect.value = 'REPLACEMENT';
         this.onPullInTypeChange('REPLACEMENT');
+      }
+
+      if (shiftPatternSelect) {
+        shiftPatternSelect.value = unit.shiftPattern === '1_SHIFT' ? '1_SHIFT' : '2_SHIFT';
       }
 
       if (effDateInput && this.selectedMonth) {
@@ -3473,6 +3565,7 @@ const PopulationModule = {
       target.reason = reason;
     } else if (actionMode === 'PULL_IN_OH' || actionMode === 'EMERGENCY_PULL_IN') {
       const targetStatus = document.getElementById('modal-roster-target-status')?.value || 'W';
+      const shiftPattern = document.getElementById('modal-roster-shift-pattern')?.value || '2_SHIFT';
       const pullInType = document.getElementById('modal-roster-pull-type')?.value || 'REPLACEMENT';
       const effectiveDate = document.getElementById('modal-roster-effective-date')?.value || '';
       const replacedUnitId = document.getElementById('modal-roster-replaced-unit')?.value || '';
@@ -3488,6 +3581,7 @@ const PopulationModule = {
       }
 
       target.status = targetStatus;
+      target.shiftPattern = shiftPattern === '1_SHIFT' ? '1_SHIFT' : '2_SHIFT';
       target.pullInType = pullInType;
       target.effectiveDate = effectiveDate;
       target.replacedUnitId = pullInType === 'REPLACEMENT' ? replacedUnitId : '';
@@ -3520,6 +3614,7 @@ const PopulationModule = {
           ADDITIONAL_FLEET: 'bg-teal-100 text-teal-800',
           PENDING_OFF_HIRE: 'bg-amber-100 text-amber-900',
           CANCEL_PENDING_OH: 'bg-slate-200 text-slate-700',
+          SHIFT_PATTERN_CHANGE: 'bg-purple-100 text-purple-800',
           SMART_SYNC_NEXT_MONTH: 'bg-cyan-100 text-cyan-800',
           COPY_ROSTER: 'bg-emerald-100 text-emerald-800'
         }[l.actionType] || 'bg-blue-100 text-blue-800';
@@ -3544,7 +3639,7 @@ const PopulationModule = {
     }
 
     const btn = document.getElementById('btn-pop-export-csv');
-    const headers = ['Site', 'Roster_Month', 'Unit_ID', 'Category', 'Equipment', 'Brand', 'Model', 'Roster_Status', 'On_Hired_Flag', 'Effective_Date', 'Pending_Off_Hire', 'Replaced_Unit_ID', 'Technical_Reason'];
+    const headers = ['Site', 'Roster_Month', 'Unit_ID', 'Category', 'Equipment', 'Brand', 'Model', 'Roster_Status', 'Shift_Pattern', 'On_Hired_Flag', 'Effective_Date', 'Pending_Off_Hire', 'Replaced_Unit_ID', 'Technical_Reason'];
     const rows = allUnits.map((u) => [
       AuthModule.currentSite,
       this.selectedMonth,
@@ -3554,6 +3649,7 @@ const PopulationModule = {
       u.brand,
       u.model,
       u.status,
+      u.shiftPattern || '2_SHIFT',
       ['W', 'SW'].includes(u.status) ? 'ON_HIRED' : 'OFF_HIRED',
       u.effectiveDate || '',
       u.pendingOffHire ? 'YES' : 'NO',
@@ -3583,7 +3679,8 @@ const PopulationModule = {
         Boolean(u.pendingOffHire) !== u._origPending ||
         (u.replacedUnitId || '') !== u._origReplaced ||
         (u.reason || '') !== u._origReason ||
-        (u.effectiveDate || '') !== (u._origEffectiveDate || '')
+        (u.effectiveDate || '') !== (u._origEffectiveDate || '') ||
+        (u.shiftPattern || '2_SHIFT') !== (u._origShiftPattern || '2_SHIFT')
     );
 
     if (changedUnits.length === 0 && !forceSave && this.isMaterialized) {
@@ -3607,6 +3704,7 @@ const PopulationModule = {
     const payloadUnits = this.rosterUnits.map((u) => ({
       unitId: u.unitId,
       status: u.status,
+      shiftPattern: u.shiftPattern || '2_SHIFT',
       pendingOffHire: Boolean(u.pendingOffHire),
       replacedUnitId: u.replacedUnitId || '',
       reason: u.reason || '',
