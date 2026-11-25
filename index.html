@@ -1103,6 +1103,8 @@
                 <option value="SW">SW (Standby Working)</option>
                 <option value="OH">OH (Off Hired)</option>
                 <option value="S">S (Scrap)</option>
+                <option value="1_SHIFT">1 Shift (Day Only)</option>
+                <option value="2_SHIFT">2 Shift (Day &amp; Night)</option>
                 <option value="PENDING_OH">Pending Off-Hire</option>
               </select>
               <input type="text" id="pop-search-input" oninput="PopulationModule.renderTable()"
@@ -1124,6 +1126,7 @@
                   <th class="px-4 py-2.5">Brand</th>
                   <th class="px-4 py-2.5">Model</th>
                   <th class="px-4 py-2.5">Roster Status</th>
+                  <th class="px-4 py-2.5">Shift Pattern</th>
                   <th class="px-4 py-2.5">Mid-Month Governance / Notes</th>
                 </tr>
               </thead>
@@ -1200,12 +1203,22 @@
                 </div>
               </div>
 
-              <div>
-                <label class="block font-bold text-slate-700 uppercase mb-1">Activate As Status</label>
-                <select id="modal-roster-target-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white">
-                  <option value="W">W (Working - Active Production)</option>
-                  <option value="SW">SW (Standby Working - Hot Spare)</option>
-                </select>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase mb-1">Activate As Status</label>
+                  <select id="modal-roster-target-status" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white">
+                    <option value="W">W (Working - Active Production)</option>
+                    <option value="SW">SW (Standby Working - Hot Spare)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block font-bold text-slate-700 uppercase mb-1">Shift Pattern</label>
+                  <select id="modal-roster-shift-pattern" class="w-full px-3 py-2 border border-slate-300 rounded-lg font-semibold bg-white">
+                    <option value="2_SHIFT">2 Shift (Day &amp; Night)</option>
+                    <option value="1_SHIFT">1 Shift (Day Only)</option>
+                  </select>
+                </div>
               </div>
 
               <div id="modal-roster-replaced-wrap">
@@ -1847,7 +1860,7 @@
   </div>
 
   <!-- External Application Logic Bundle (Split into Core + Report/PDF Module) -->
-  <script src="app.js?v=24"></script>
+  <script src="app.js?v=25"></script>
   <script src="report-pdf.js?v=23"></script>
 </body>
 </html>
