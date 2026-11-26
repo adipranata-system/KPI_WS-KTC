@@ -693,11 +693,13 @@ const ReportModule = {
     const byModel = this.kpiData.byModel || [];
     const tfootModel = document.getElementById('rep-tfoot-model');
     const topGlobalComp = (this.kpiData.pareto && this.kpiData.pareto.length > 0) ? this.kpiData.pareto[0].component : '-';
+    const totalPopCount = (this.kpiData.byUnit || []).length;
     document.getElementById('rep-tbody-model').innerHTML = byModel.length === 0
-      ? `<tr><td colspan="13" class="px-3 py-3 text-center text-slate-400">Belum ada data pada periode evaluasi.</td></tr>`
+      ? `<tr><td colspan="14" class="px-3 py-3 text-center text-slate-400">Belum ada data pada periode evaluasi.</td></tr>`
       : byModel.map((m) => `
           <tr class="border-b border-slate-200">
             <td class="px-2.5 py-1.5 font-bold text-slate-900">${m.model}</td>
+            <td class="px-2.5 py-1.5 text-slate-700 font-medium whitespace-nowrap">${m.shiftLabel || `${m.unitCount || 0} Unit`}</td>
             <td class="px-2.5 py-1.5 text-right">${m.wh.toFixed(1)}</td>
             <td class="px-2.5 py-1.5 text-right text-rose-700 font-semibold">${m.bdUnsched.toFixed(1)}</td>
             <td class="px-2.5 py-1.5 text-right font-semibold text-slate-800">${Number(m.freqUnsched) || 0}</td>
@@ -716,6 +718,7 @@ const ReportModule = {
       tfootModel.innerHTML = byModel.length === 0 ? '' : `
         <tr>
           <td class="px-2.5 py-1.5 uppercase">TOTAL / RATA-RATA ARMADA</td>
+          <td class="px-2.5 py-1.5 whitespace-nowrap">${totalPopCount} Unit</td>
           <td class="px-2.5 py-1.5 text-right">${ov.wh.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${ov.bdUnsched.toFixed(1)}</td>
           <td class="px-2.5 py-1.5 text-right">${Number(ov.freqUnsched) || 0}</td>
@@ -786,34 +789,34 @@ const ReportModule = {
               <td class="px-2 py-1.5 text-right">${sumStby.toFixed(1)}</td>
               <td class="px-2 py-1.5 text-right">${ov.pa.toFixed(2)}%</td>
               <td class="px-2 py-1.5 text-right">${ov.ma.toFixed(2)}%</td>
-              <td class="px-2 py-1.5 text-right">${ov.ua.toFixed(2)}%</td>
-              <td class="px-2 py-1.5 text-right">${ov.mttr.toFixed(2)}j</td>
-              <td class="px-2 py-1.5 text-right">${ov.mtbr.toFixed(2)}j</td>
-            </tr>`;
-        }
-      }
-    }
-
-    // 3.3 Unit Table (Weekly = Watchlist PA < 85%, Monthly = Full Fleet Audit Sorted High PA -> Low PA)
+    // 3.3 Unit Table (Weekly = All Units Sorted Lowest PA First for Meeting, Monthly = Full Fleet Audit Sorted High PA -> Low PA)
     const allUnits = [...(this.kpiData.byUnit || [])];
     const displayUnits = isWeekly
-      ? allUnits.filter((u) => u.pa < target).sort((a, b) => a.pa - b.pa)
+      ? allUnits.sort((a, b) => a.pa - b.pa || a.unitId.localeCompare(b.unitId))
       : allUnits.sort((a, b) => b.pa - a.pa || a.unitId.localeCompare(b.unitId));
+    const belowTargetCount = displayUnits.filter((u) => u.pa < target).length;
 
     document.getElementById('rep-unit-section-title').textContent = isWeekly
-      ? '3.3 Watchlist Unit Prioritas (PA Di Bawah Target 85%)'
+      ? '3.3 Detailed KPI by Unit — Evaluasi Mingguan (Urut PA Terendah ke Tertinggi)'
       : '3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan - Urut PA Tertinggi ke Terendah)';
     document.getElementById('rep-unit-section-badge').textContent = isWeekly
-      ? `${displayUnits.length} Unit Perlu Perhatian`
+      ? `${displayUnits.length} Unit On-Hired (${belowTargetCount} Below Target)`
       : `Total ${displayUnits.length} Unit Dievaluasi`;
 
     document.getElementById('rep-tbody-unit').innerHTML = displayUnits.length === 0
-      ? `<tr><td colspan="13" class="px-3 py-3 text-center text-emerald-700 font-semibold">${isWeekly ? 'Seluruh unit mencapai target PA ≥ 85% pada minggu ini.' : 'Belum ada data unit.'}</td></tr>`
+      ? `<tr><td colspan="13" class="px-3 py-3 text-center text-slate-400">Belum ada data unit.</td></tr>`
       : displayUnits.map((u) => {
           const isPass = u.pa >= target;
+          const tags = [];
+          if (u.shiftPattern === '1_SHIFT') {
+            tags.push('<span class="ml-1 px-1 py-0.2 text-[9px] font-bold bg-teal-100 text-teal-800 rounded">1-Shift</span>');
+          }
+          if (u.rosterStatus === 'SW') {
+            tags.push('<span class="ml-1 px-1 py-0.2 text-[9px] font-bold bg-blue-100 text-blue-800 rounded">SW</span>');
+          }
           return `
             <tr class="border-b border-slate-200 ${!isPass ? 'bg-rose-50/40' : ''}">
-              <td class="px-2.5 py-1.5 font-bold text-slate-900">${u.unitId}</td>
+              <td class="px-2.5 py-1.5 font-bold text-slate-900 whitespace-nowrap">${u.unitId}${tags.join('')}</td>
               <td class="px-2.5 py-1.5">${u.model}</td>
               <td class="px-2.5 py-1.5 text-right">${u.wh.toFixed(1)}</td>
               <td class="px-2.5 py-1.5 text-right text-rose-700">${u.bdUnsched.toFixed(1)}</td>
@@ -1481,8 +1484,10 @@ const ReportModule = {
       const topGlobalCompPdf = (this.kpiData.pareto && this.kpiData.pareto.length > 0)
         ? sanitizePdfText(this.kpiData.pareto[0].component)
         : '-';
+      const totalPopPdf = (this.kpiData.byUnit || []).length;
       const modelRows = (this.kpiData.byModel || []).map((m) => [
         m.model,
+        sanitizePdfText(m.shiftLabel || `${m.unitCount || 0} Unit`),
         m.wh.toFixed(1),
         m.bdUnsched.toFixed(1),
         String(Number(m.freqUnsched) || 0),
@@ -1500,10 +1505,11 @@ const ReportModule = {
       doc.autoTable({
         startY: curY,
         margin: { left: margin, right: margin },
-        head: [['Model Unit', 'WH (Jam)', 'BD Unsch', 'Freq', 'Kontribusi BD', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR', 'Komponen Dominan']],
-        body: modelRows.length > 0 ? modelRows : [['-', '0', '0', '0', '0.0%', '0', '0', '0%', '0%', '0%', '0j', '0j', '-']],
+        head: [['Model Unit', 'Populasi / Pola', 'WH (Jam)', 'BD Unsch', 'Freq', 'Kontribusi BD', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR', 'Komponen Dominan']],
+        body: modelRows.length > 0 ? modelRows : [['-', '0 Unit', '0', '0', '0', '0.0%', '0', '0', '0%', '0%', '0%', '0j', '0j', '-']],
         foot: modelRows.length > 0 ? [[
           'TOTAL / RATA-RATA',
+          `${totalPopPdf} Unit`,
           ov.wh.toFixed(1),
           ov.bdUnsched.toFixed(1),
           String(Number(ov.freqUnsched) || 0),
@@ -1517,6 +1523,75 @@ const ReportModule = {
           `${ov.mtbr.toFixed(2)}j`,
           topGlobalCompPdf
         ]] : undefined,
+        theme: 'grid',
+        styles: { fontSize: 6.6, cellPadding: 1.35 },
+        headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
+        footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+        showFoot: 'lastPage',
+        columnStyles: {
+          2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
+          6: { halign: 'right' }, 7: { halign: 'right' }, 8: { halign: 'right', fontStyle: 'bold' },
+          9: { halign: 'right', fontStyle: 'bold' }, 10: { halign: 'right', fontStyle: 'bold' },
+          11: { halign: 'right' }, 12: { halign: 'right' }
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && [8, 9, 10].includes(data.column.index)) {
+            const num = parseFloat(String(data.cell.raw || '0'));
+            if (!isNaN(num)) {
+              data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
+            }
+          }
+        }
+      });
+      curY = doc.lastAutoTable.finalY + 5;
+
+      // 3.3 Unit Table (Weekly = All Units Sorted Lowest PA First, Monthly = Full Fleet Audit Sorted High PA -> Low PA)
+      ensureSpace(28);
+      const allUnits = [...(this.kpiData.byUnit || [])];
+      const unitList = isWeekly
+        ? allUnits.sort((a, b) => a.pa - b.pa || a.unitId.localeCompare(b.unitId))
+        : allUnits.sort((a, b) => b.pa - a.pa || a.unitId.localeCompare(b.unitId));
+      const belowTargetPdfCount = unitList.filter((u) => u.pa < target).length;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8.5);
+      doc.setTextColor(15, 23, 42);
+      doc.text(
+        isWeekly
+          ? `3.3 Detailed KPI by Unit - Evaluasi Mingguan (Urut PA Terendah): ${unitList.length} Unit (${belowTargetPdfCount} Below Target)`
+          : `3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan - Urut PA Tertinggi ke Terendah): ${unitList.length} Unit`,
+        margin,
+        curY
+      );
+      curY += 2;
+
+      const unitRows = unitList.map((u) => {
+        const badges = [];
+        if (u.shiftPattern === '1_SHIFT') badges.push('1-Shift');
+        if (u.rosterStatus === 'SW') badges.push('SW');
+        const unitLabel = badges.length > 0 ? `${u.unitId} (${badges.join(', ')})` : u.unitId;
+        return [
+          unitLabel,
+          u.model,
+          u.wh.toFixed(1),
+          u.bdUnsched.toFixed(1),
+          String(Number(u.freqUnsched) || 0),
+          u.bdSched.toFixed(1),
+          u.stbyHrs.toFixed(1),
+          `${u.pa.toFixed(2)}%`,
+          `${u.ma.toFixed(2)}%`,
+          `${u.ua.toFixed(2)}%`,
+          `${u.mttr.toFixed(2)}j`,
+          `${u.mtbr.toFixed(2)}j`,
+          u.pa >= target ? 'TERCAPAI' : 'BELOW'
+        ];
+      });
+
+      doc.autoTable({
+        startY: curY,
+        margin: { left: margin, right: margin },
+        head: [['Unit ID', 'Model', 'WH (Jam)', 'BD Unsch', 'Freq', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR', 'Status']],
+        body: unitRows.length > 0 ? unitRows : [['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', 'NIHIL']],
         theme: 'grid',
         styles: { fontSize: 6.8, cellPadding: 1.4 },
         headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
@@ -1939,15 +2014,15 @@ function getDemoApiResponse(action, payload, session) {
         }
       ],
       byModel: [
-        { model: 'ZX870H-3F', wh: 340.0, bdUnsched: 32.0, bdSharePct: 55.2, freqUnsched: 12, bdSched: 18.0, stbyHrs: 24.0, topComponent: 'HYD - Hydraulic System (20.5j)', pa: 87.5, ma: 91.4, ua: 87.2, mttr: 2.67, mtbr: 28.3 },
-        { model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, bdSharePct: 13.8, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, topComponent: 'ENG - Engine & Cooling (8.0j)', pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
-        { model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, bdSharePct: 31.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, topComponent: 'UND - Undercarriage (13.5j)', pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
+        { model: 'ZX870H-3F', unitCount: 2, shiftLabel: '2 Unit (2-Shift)', wh: 340.0, bdUnsched: 32.0, bdSharePct: 55.2, freqUnsched: 12, bdSched: 18.0, stbyHrs: 24.0, topComponent: 'HYD - Hydraulic System (20.5j)', pa: 87.5, ma: 91.4, ua: 87.2, mttr: 2.67, mtbr: 28.3 },
+        { model: 'CAT-777E', unitCount: 1, shiftLabel: '1 Unit (2-Shift)', wh: 180.0, bdUnsched: 8.0, bdSharePct: 13.8, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, topComponent: 'ENG - Engine & Cooling (8.0j)', pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
+        { model: 'D85ESS-2', unitCount: 1, shiftLabel: '1 Unit (1-Shift)', wh: 120.0, bdUnsched: 18.0, bdSharePct: 31.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, topComponent: 'UND - Undercarriage (13.5j)', pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
       ],
       byUnit: [
-        { unitId: 'EX-1320', model: 'ZX870H-3F', wh: 182.0, bdUnsched: 10.0, freqUnsched: 4, bdSched: 8.0, stbyHrs: 12.0, pa: 91.0, ma: 94.8, ua: 91.0, mttr: 2.5, mtbr: 45.5 },
-        { unitId: 'EX-1351', model: 'ZX870H-3F', wh: 158.0, bdUnsched: 22.0, freqUnsched: 8, bdSched: 10.0, stbyHrs: 12.0, pa: 84.0, ma: 87.8, ua: 83.2, mttr: 2.75, mtbr: 19.8 },
-        { unitId: 'DT-4012', model: 'CAT-777E', wh: 180.0, bdUnsched: 8.0, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
-        { unitId: 'DZ-85', model: 'D85ESS-2', wh: 120.0, bdUnsched: 18.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
+        { unitId: 'EX-1320', model: 'ZX870H-3F', shiftPattern: '2_SHIFT', rosterStatus: 'W', wh: 182.0, bdUnsched: 10.0, freqUnsched: 4, bdSched: 8.0, stbyHrs: 12.0, pa: 91.0, ma: 94.8, ua: 91.0, mttr: 2.5, mtbr: 45.5 },
+        { unitId: 'EX-1351', model: 'ZX870H-3F', shiftPattern: '2_SHIFT', rosterStatus: 'W', wh: 158.0, bdUnsched: 22.0, freqUnsched: 8, bdSched: 10.0, stbyHrs: 12.0, pa: 84.0, ma: 87.8, ua: 83.2, mttr: 2.75, mtbr: 19.8 },
+        { unitId: 'DT-4012', model: 'CAT-777E', shiftPattern: '2_SHIFT', rosterStatus: 'SW', wh: 180.0, bdUnsched: 8.0, freqUnsched: 4, bdSched: 10.0, stbyHrs: 12.0, pa: 91.0, ma: 95.7, ua: 90.0, mttr: 2.0, mtbr: 45.0 },
+        { unitId: 'DZ-85', model: 'D85ESS-2', shiftPattern: '1_SHIFT', rosterStatus: 'W', wh: 120.0, bdUnsched: 18.0, freqUnsched: 6, bdSched: 8.0, stbyHrs: 12.0, pa: 83.75, ma: 86.96, ua: 81.08, mttr: 3.0, mtbr: 20.0 }
       ]
     };
   }
