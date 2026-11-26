@@ -789,6 +789,14 @@ const ReportModule = {
               <td class="px-2 py-1.5 text-right">${sumStby.toFixed(1)}</td>
               <td class="px-2 py-1.5 text-right">${ov.pa.toFixed(2)}%</td>
               <td class="px-2 py-1.5 text-right">${ov.ma.toFixed(2)}%</td>
+              <td class="px-2 py-1.5 text-right">${ov.ua.toFixed(2)}%</td>
+              <td class="px-2 py-1.5 text-right">${ov.mttr.toFixed(2)}j</td>
+              <td class="px-2 py-1.5 text-right">${ov.mtbr.toFixed(2)}j</td>
+            </tr>`;
+        }
+      }
+    }
+
     // 3.3 Unit Table (Weekly = All Units Sorted Lowest PA First for Meeting, Monthly = Full Fleet Audit Sorted High PA -> Low PA)
     const allUnits = [...(this.kpiData.byUnit || [])];
     const displayUnits = isWeekly
@@ -1595,68 +1603,6 @@ const ReportModule = {
         theme: 'grid',
         styles: { fontSize: 6.8, cellPadding: 1.4 },
         headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
-        footStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
-        showFoot: 'lastPage',
-        columnStyles: {
-          1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' },
-          5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' },
-          8: { halign: 'right', fontStyle: 'bold' }, 9: { halign: 'right', fontStyle: 'bold' },
-          10: { halign: 'right' }, 11: { halign: 'right' }
-        },
-        didParseCell: (data) => {
-          if (data.section === 'body' && [7, 8, 9].includes(data.column.index)) {
-            const num = parseFloat(String(data.cell.raw || '0'));
-            if (!isNaN(num)) {
-              data.cell.styles.textColor = num >= target ? [4, 120, 87] : [190, 18, 60];
-            }
-          }
-        }
-      });
-      curY = doc.lastAutoTable.finalY + 5;
-
-      // 3.3 Unit Table (Weekly = Watchlist PA < 85%, Monthly = Full Fleet Audit Sorted High PA -> Low PA)
-      ensureSpace(28);
-      const allUnits = [...(this.kpiData.byUnit || [])];
-      const unitList = isWeekly
-        ? allUnits.filter((u) => u.pa < target).sort((a, b) => a.pa - b.pa)
-        : allUnits.sort((a, b) => b.pa - a.pa || a.unitId.localeCompare(b.unitId));
-
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8.5);
-      doc.setTextColor(15, 23, 42);
-      doc.text(
-        isWeekly
-          ? `3.3 Watchlist Unit Prioritas (PA < ${target}%): ${unitList.length} Unit`
-          : `3.3 Rincian Lengkap Performa Seluruh Unit (Audit Bulanan - Urut PA Tertinggi ke Terendah): ${unitList.length} Unit`,
-        margin,
-        curY
-      );
-      curY += 2;
-
-      const unitRows = unitList.map((u) => [
-        u.unitId,
-        u.model,
-        u.wh.toFixed(1),
-        u.bdUnsched.toFixed(1),
-        String(Number(u.freqUnsched) || 0),
-        u.bdSched.toFixed(1),
-        u.stbyHrs.toFixed(1),
-        `${u.pa.toFixed(2)}%`,
-        `${u.ma.toFixed(2)}%`,
-        `${u.ua.toFixed(2)}%`,
-        `${u.mttr.toFixed(2)}j`,
-        `${u.mtbr.toFixed(2)}j`,
-        u.pa >= target ? 'TERCAPAI' : 'BELOW'
-      ]);
-
-      doc.autoTable({
-        startY: curY,
-        margin: { left: margin, right: margin },
-        head: [['Unit ID', 'Model', 'WH (Jam)', 'BD Unsch', 'Freq', 'BD Sch', 'Standby', 'PA (%)', 'MA (%)', 'UA (%)', 'MTTR', 'MTBR', 'Status']],
-        body: unitRows.length > 0 ? unitRows : [['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', isWeekly ? 'SEMUA UNIT TERCAPAI' : 'NIHIL']],
-        theme: 'grid',
-        styles: { fontSize: 7.1, cellPadding: 1.5 },
-        headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: 'bold' },
         columnStyles: {
           2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' },
           6: { halign: 'right' }, 7: { halign: 'right', fontStyle: 'bold' }, 8: { halign: 'right' },
@@ -1675,7 +1621,7 @@ const ReportModule = {
               if (st === 'BELOW') {
                 data.cell.styles.textColor = [190, 18, 60];
                 data.cell.styles.fillColor = [255, 241, 242];
-              } else if (st === 'TERCAPAI' || st === 'SEMUA UNIT TERCAPAI') {
+              } else if (st === 'TERCAPAI') {
                 data.cell.styles.textColor = [4, 120, 87];
               }
             }
