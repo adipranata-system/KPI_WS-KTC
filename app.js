@@ -2167,6 +2167,7 @@ const InputHmModule = {
   dayName: '',
   isFriday: false,
   shortcutsBound: false,
+  exportMode: 'RANGE',
   activeUnitsForDate: null,
   lastHmMap: {},
   lastHmInfoMap: {},
@@ -2884,33 +2885,136 @@ const InputHmModule = {
     }
   },
 
-  exportCsv() {
-    const allRows = [];
-    ['DAY', 'NIGHT'].forEach((sh) => {
-      (this.operations[sh] || []).forEach((r) => {
-        if (!r.unitId) return;
-        allRows.push([
-          AuthModule.currentSite,
-          this.selectedDate,
-          sh,
-          r.unitId,
-          r.model || '',
-          r.hmStart !== '' ? r.hmStart : '',
-          r.hmEnd !== '' ? r.hmEnd : '',
-          (Number(r.wh) || 0).toFixed(2)
-        ]);
-      });
-    });
+  openExportModal() {
+    this.init();
+    const modal = document.getElementById('modal-hm-export');
+    const siteLabel = document.getElementById('hm-export-site-label');
+    const startInput = document.getElementById('hm-export-start-date');
+    const endInput = document.getElementById('hm-export-end-date');
+    const monthInput = document.getElementById('hm-export-month');
 
-    if (allRows.length === 0) {
-      showToast('No HM rows populated to export.', 'warning');
+    const now = new Date();
+    const fallbackDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const baseDate = this.selectedDate || fallbackDate;
+
+    if (siteLabel) siteLabel.textContent = AuthModule.currentSite;
+    if (startInput) startInput.value = baseDate;
+    if (endInput) endInput.value = baseDate;
+    if (monthInput) monthInput.value = baseDate.slice(0, 7);
+
+    this.onExportModeChange('RANGE');
+    modal?.classList.remove('hidden');
+  },
+
+  closeExportModal() {
+    document.getElementById('modal-hm-export')?.classList.add('hidden');
+  },
+
+  onExportModeChange(mode) {
+    const cleanMode = mode === 'MONTH' ? 'MONTH' : 'RANGE';
+    this.exportMode = cleanMode;
+
+    const radioRange = document.getElementById('hm-export-mode-range');
+    const radioMonth = document.getElementById('hm-export-mode-month');
+    const cardRange = document.getElementById('hm-export-card-range');
+    const cardMonth = document.getElementById('hm-export-card-month');
+
+    if (radioRange) radioRange.checked = cleanMode === 'RANGE';
+    if (radioMonth) radioMonth.checked = cleanMode === 'MONTH';
+
+    const activeCardCls = 'p-3.5 rounded-xl border-2 border-emerald-600 bg-emerald-50/40 space-y-3 cursor-pointer transition';
+    const inactiveCardCls = 'p-3.5 rounded-xl border-2 border-slate-200 bg-white hover:border-slate-300 space-y-3 cursor-pointer transition';
+
+    if (cardRange) cardRange.className = cleanMode === 'RANGE' ? activeCardCls : inactiveCardCls;
+    if (cardMonth) cardMonth.className = cleanMode === 'MONTH' ? activeCardCls : inactiveCardCls;
+  },
+
+  exportCsv() {
+    this.openExportModal();
+  },
+
+  async submitExportCsv() {
+    const mode = this.exportMode || (document.getElementById('hm-export-mode-month')?.checked ? 'MONTH' : 'RANGE');
+    const startDate = document.getElementById('hm-export-start-date')?.value || '';
+    const endDate = document.getElementById('hm-export-end-date')?.value || '';
+    const monthVal = document.getElementById('hm-export-month')?.value || '';
+
+    if (mode === 'RANGE') {
+      if (!startDate || !endDate) {
+        showToast('Please select both From Date and To Date.', 'warning');
+        return;
+      }
+      if (startDate > endDate) {
+        showToast('From Date cannot be later than To Date.', 'error');
+        return;
+      }
+    } else if (!monthVal) {
+      showToast('Please select a Month Period.', 'warning');
       return;
     }
 
-    const btn = document.getElementById('btn-hm-export-csv');
+    const btn = document.getElementById('btn-confirm-hm-export');
+    const defaultBtnHtml = '<span>Download CSV</span>';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+        </svg>
+        <span>Fetching from Database...</span>`;
+    }
+
+    const res = await callBackendApi('EXPORT_OPERATION_LOGS', {
+      site: AuthModule.currentSite,
+      mode: mode,
+      startDate: startDate,
+      endDate: endDate,
+      month: monthVal
+    });
+
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = defaultBtnHtml;
+    }
+
+    if (res.status !== 'success') {
+      showToast(res.message || 'Failed to export operational HM logs.', 'error');
+      return;
+    }
+
+    const records = res.rows || [];
+    if (records.length === 0) {
+      showToast(
+        mode === 'MONTH'
+          ? `No saved operational HM records found in database for ${AuthModule.currentSite} (${monthVal}).`
+          : `No saved operational HM records found in database for ${AuthModule.currentSite} (${startDate} to ${endDate}).`,
+        'warning'
+      );
+      return;
+    }
+
     const headers = ['Site', 'Date', 'Shift', 'Unit_ID', 'Model', 'Start_HM', 'End_HM', 'Working_Hours'];
-    downloadCsvFile(`MPS_Daily_HM_${AuthModule.currentSite}_${this.selectedDate}.csv`, headers, allRows, btn);
-    showToast('Daily HM rows exported to CSV.', 'success');
+    const csvRows = records.map((r) => [
+      r.site || AuthModule.currentSite,
+      r.date || '',
+      r.shift || '',
+      r.unitId || '',
+      r.model || '',
+      r.hmStart !== undefined && r.hmStart !== '' ? r.hmStart : 0,
+      r.hmEnd !== undefined && r.hmEnd !== '' ? r.hmEnd : 0,
+      (Number(r.wh) || 0).toFixed(2)
+    ]);
+
+    const filename = mode === 'MONTH'
+      ? `MPS_Monthly_HM_${AuthModule.currentSite}_${monthVal}.csv`
+      : startDate === endDate
+      ? `MPS_Daily_HM_${AuthModule.currentSite}_${startDate}.csv`
+      : `MPS_Daily_HM_${AuthModule.currentSite}_${startDate}_to_${endDate}.csv`;
+
+    downloadCsvFile(filename, headers, csvRows);
+    this.closeExportModal();
+    showToast(`Exported ${records.length} saved HM record(s) to ${filename}.`, 'success');
   },
 
   async saveAll() {
