@@ -848,7 +848,7 @@
                   class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg shadow-sm transition">
                   &#9889; Auto-Fill Active Units Day &amp; Night (Alt+W)
                 </button>
-                <button type="button" id="btn-hm-export-csv" onclick="InputHmModule.exportCsv()"
+                <button type="button" id="btn-hm-export-csv" onclick="InputHmModule.openExportModal()"
                   class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold rounded-lg shadow-sm transition cursor-pointer">
                   <span>Export CSV</span>
                 </button>
@@ -1004,6 +1004,95 @@
           </button>
         </div>
       </section>
+
+      <!-- Hybrid Export CSV Modal for Daily HM Input (Date Range vs Full Month from Database) -->
+      <div id="modal-hm-export" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+          <div class="px-5 py-4 bg-slate-900 text-white flex items-center justify-between">
+            <div>
+              <h3 class="text-sm font-extrabold uppercase tracking-wide">Export Operational HM Logs (CSV)</h3>
+              <p class="text-[11px] text-slate-300 mt-0.5">Fetches verified saved records directly from Central Fleet Database</p>
+            </div>
+            <button type="button" onclick="InputHmModule.closeExportModal()" class="text-slate-400 hover:text-white text-xl font-bold">&times;</button>
+          </div>
+
+          <div class="p-5 space-y-4 text-xs">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+              <span class="text-slate-500 font-semibold">Active Site:</span>
+              <span id="hm-export-site-label" class="font-extrabold text-slate-900 text-sm">TTLP</span>
+            </div>
+
+            <!-- Option 1: Export by Date Range (From Date - To Date) -->
+            <div id="hm-export-card-range" onclick="InputHmModule.onExportModeChange('RANGE')"
+              class="p-3.5 rounded-xl border-2 border-emerald-600 bg-emerald-50/40 space-y-3 cursor-pointer transition">
+              <label class="flex items-start gap-2.5 cursor-pointer">
+                <input type="radio" name="hm-export-mode" id="hm-export-mode-range" value="RANGE" checked
+                  onchange="InputHmModule.onExportModeChange('RANGE')"
+                  class="mt-0.5 w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                <div>
+                  <div class="font-extrabold text-slate-900 uppercase">1. Export by Date Range (From Date &ndash; To Date)</div>
+                  <p class="text-[11px] text-slate-600 mt-0.5">
+                    Select a single date (same From &amp; To) or any custom multi-day range without opening dates one by one.
+                  </p>
+                </div>
+              </label>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-6" onclick="event.stopPropagation()">
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">From Date</label>
+                  <input type="date" id="hm-export-start-date"
+                    onfocus="InputHmModule.onExportModeChange('RANGE')"
+                    class="w-full px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-emerald-600" />
+                </div>
+                <div>
+                  <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">To Date</label>
+                  <input type="date" id="hm-export-end-date"
+                    onfocus="InputHmModule.onExportModeChange('RANGE')"
+                    class="w-full px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-emerald-600" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Option 2: Export Full Month -->
+            <div id="hm-export-card-month" onclick="InputHmModule.onExportModeChange('MONTH')"
+              class="p-3.5 rounded-xl border-2 border-slate-200 bg-white hover:border-slate-300 space-y-3 cursor-pointer transition">
+              <label class="flex items-start gap-2.5 cursor-pointer">
+                <input type="radio" name="hm-export-mode" id="hm-export-mode-month" value="MONTH"
+                  onchange="InputHmModule.onExportModeChange('MONTH')"
+                  class="mt-0.5 w-4 h-4 text-emerald-600 focus:ring-emerald-500" />
+                <div>
+                  <div class="font-extrabold text-slate-900 uppercase">2. Export Full Month Recap (YYYY-MM)</div>
+                  <p class="text-[11px] text-slate-600 mt-0.5">
+                    Downloads all saved Day &amp; Night Shift HM logs from Day 1 through month-end in a single CSV file.
+                  </p>
+                </div>
+              </label>
+
+              <div class="pl-6" onclick="event.stopPropagation()">
+                <label class="block text-[10px] font-bold text-slate-600 uppercase mb-1">Month Period</label>
+                <input type="month" id="hm-export-month"
+                  onfocus="InputHmModule.onExportModeChange('MONTH')"
+                  class="w-full sm:w-56 px-3 py-1.5 text-xs font-bold border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-emerald-600" />
+              </div>
+            </div>
+
+            <div class="px-3 py-2 rounded-lg bg-blue-50/70 border border-blue-200 text-[11px] text-blue-900">
+              <strong>CSV Format (8 Columns):</strong> Site, Date, Shift, Unit_ID, Model, Start_HM, End_HM, Working_Hours
+            </div>
+          </div>
+
+          <div class="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2 text-xs">
+            <button type="button" onclick="InputHmModule.closeExportModal()"
+              class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition">
+              Cancel
+            </button>
+            <button type="button" id="btn-confirm-hm-export" onclick="InputHmModule.submitExportCsv()"
+              class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold rounded-lg shadow transition">
+              <span>Download CSV</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- ===================================================== -->
       <!-- TAB 5: UNIT POPULATION REGISTRY                       -->
@@ -1868,7 +1957,7 @@
   </div>
 
   <!-- External Application Logic Bundle (Split into Core + Report/PDF Module) -->
-  <script src="app.js?v=26"></script>
+  <script src="app.js?v=27"></script>
   <script src="report-pdf.js?v=24"></script>
 </body>
 </html>
